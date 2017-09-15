@@ -1,0 +1,41 @@
+{
+  "nodes": [
+    {
+      "index": 0, 
+      "nodeType": "inter-router", 
+      "name": "R.0", 
+      "weight": 0, 
+      "listenerKeys": [
+        "5675", 
+        "22001"
+      ], 
+      "px": 262, 
+      "py": 93, 
+      "id": 0, 
+      "routerId": "R.0", 
+      "listeners": {
+        "22001": {
+          "host": "0.0.0.0", 
+          "port": "22001", 
+          "name": "Broker", 
+          "saslMechanisms": "ANONYMOUS"
+        }, 
+        "5675": {
+          "host": "0.0.0.0", 
+          "http": "true", 
+          "saslMechanisms": "ANONYMOUS", 
+          "port": "5675"
+        }
+      }, 
+      "highlighted": false, 
+      "key": "amqp:/_topo/0/R.0/$management", 
+      "y": 93, 
+      "x": 262, 
+      "fixed": 0, 
+      "properties": {}, 
+      "cls": ""
+    }
+  ], 
+  "links": [], 
+  "topology": "config-broker"
+}

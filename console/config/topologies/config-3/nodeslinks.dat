@@ -1,0 +1,91 @@
+{
+  "nodes": [
+    {
+      "index": 0, 
+      "nodeType": "inter-router", 
+      "name": "R.0", 
+      "weight": 2, 
+      "px": 158.08103460287364, 
+      "py": 30.680716403660767, 
+      "resultIndex": null, 
+      "id": 0, 
+      "routerId": "R.0", 
+      "host": "0.0.0.0:20000", 
+      "highlighted": false, 
+      "key": "amqp:/_topo/0/R.0/$management", 
+      "y": 30.666162135012442, 
+      "x": 158.0572860466437, 
+      "fixed": 0, 
+      "properties": {}, 
+      "cls": ""
+    }, 
+    {
+      "index": 1, 
+      "nodeType": "inter-router", 
+      "name": "R.1", 
+      "weight": 2, 
+      "px": 310.3902400502323, 
+      "py": 34.664681879005315, 
+      "resultIndex": null, 
+      "id": 1, 
+      "routerId": "R.1", 
+      "host": "0.0.0.0:20001", 
+      "highlighted": false, 
+      "key": "amqp:/_topo/0/R.1/$management", 
+      "y": 34.651393289762574, 
+      "x": 310.41471847429744, 
+      "fixed": 0, 
+      "properties": {}, 
+      "cls": ""
+    }, 
+    {
+      "index": 2, 
+      "nodeType": "inter-router", 
+      "name": "R.2", 
+      "weight": 2, 
+      "px": 230.7656814243808, 
+      "py": 164.60258734749752, 
+      "resultIndex": null, 
+      "id": 2, 
+      "routerId": "R.2", 
+      "host": "0.0.0.0:20002", 
+      "highlighted": false, 
+      "key": "amqp:/_topo/0/R.2/$management", 
+      "y": 164.6304302053886, 
+      "x": 230.76495155654558, 
+      "fixed": 0, 
+      "properties": {}, 
+      "cls": ""
+    }
+  ], 
+  "links": [
+    {
+      "right": true, 
+      "uid": "1.0", 
+      "highlighted": false, 
+      "source": 0, 
+      "left": false, 
+      "cls": "", 
+      "target": 1
+    }, 
+    {
+      "right": true, 
+      "uid": "2.0", 
+      "highlighted": false, 
+      "source": 0, 
+      "left": false, 
+      "cls": "", 
+      "target": 2
+    }, 
+    {
+      "right": true, 
+      "uid": "2.1", 
+      "highlighted": false, 
+      "source": 1, 
+      "left": false, 
+      "cls": "", 
+      "target": 2
+    }
+  ], 
+  "topology": "config-3"
+}

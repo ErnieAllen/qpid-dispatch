@@ -1,0 +1,187 @@
+{
+  "nodes": [
+    {
+      "index": 0, 
+      "nodeType": "inter-router", 
+      "name": "R.0", 
+      "weight": 4, 
+      "px": 266.25228736144686, 
+      "py": 108.48156332207233, 
+      "id": 0, 
+      "routerId": "R.0", 
+      "host": "0.0.0.0:20000", 
+      "highlighted": false, 
+      "key": "amqp:/_topo/0/R.0/$management", 
+      "y": 108.41542580327378, 
+      "x": 266.23379334323295, 
+      "fixed": 0, 
+      "properties": {}, 
+      "cls": ""
+    }, 
+    {
+      "index": 1, 
+      "nodeType": "inter-router", 
+      "name": "R.1", 
+      "weight": 4, 
+      "px": 198.25584290763788, 
+      "py": 194.7372192290013, 
+      "id": 1, 
+      "routerId": "R.1", 
+      "host": "0.0.0.0:20001", 
+      "highlighted": false, 
+      "key": "amqp:/_topo/0/R.1/$management", 
+      "y": 194.73436291000283, 
+      "x": 198.18736655296718, 
+      "fixed": 0, 
+      "properties": {}, 
+      "cls": ""
+    }, 
+    {
+      "index": 2, 
+      "nodeType": "inter-router", 
+      "name": "R.2", 
+      "weight": 4, 
+      "px": 369.45591108308224, 
+      "py": 146.74119364333166, 
+      "id": 2, 
+      "routerId": "R.2", 
+      "host": "0.0.0.0:20002", 
+      "highlighted": false, 
+      "key": "amqp:/_topo/0/R.2/$management", 
+      "y": 146.69625869600827, 
+      "x": 369.5150525426326, 
+      "fixed": 0, 
+      "properties": {}, 
+      "cls": ""
+    }, 
+    {
+      "index": 3, 
+      "nodeType": "inter-router", 
+      "name": "R.3", 
+      "weight": 4, 
+      "px": 258.57497086109873, 
+      "py": 286.8371508756277, 
+      "id": 3, 
+      "routerId": "R.3", 
+      "host": "0.0.0.0:20003", 
+      "highlighted": false, 
+      "key": "amqp:/_topo/0/R.3/$management", 
+      "y": 286.90493741762157, 
+      "x": 258.5447481806081, 
+      "fixed": 0, 
+      "properties": {}, 
+      "cls": ""
+    }, 
+    {
+      "index": 4, 
+      "nodeType": "inter-router", 
+      "name": "R.4", 
+      "weight": 4, 
+      "px": 365.0620257684511, 
+      "py": 256.8825230226282, 
+      "id": 4, 
+      "routerId": "R.4", 
+      "host": "0.0.0.0:20004", 
+      "highlighted": false, 
+      "key": "amqp:/_topo/0/R.4/$management", 
+      "y": 256.92736504762183, 
+      "x": 365.11857711904133, 
+      "fixed": 0, 
+      "properties": {}, 
+      "cls": ""
+    }
+  ], 
+  "links": [
+    {
+      "right": true, 
+      "uid": "1.0", 
+      "highlighted": false, 
+      "source": 0, 
+      "left": false, 
+      "cls": "", 
+      "target": 1
+    }, 
+    {
+      "right": true, 
+      "uid": "3.1", 
+      "highlighted": false, 
+      "source": 1, 
+      "left": false, 
+      "cls": "", 
+      "target": 3
+    }, 
+    {
+      "right": true, 
+      "uid": "4.3", 
+      "highlighted": false, 
+      "source": 3, 
+      "left": false, 
+      "cls": "", 
+      "target": 4
+    }, 
+    {
+      "right": true, 
+      "uid": "2.4", 
+      "highlighted": false, 
+      "source": 4, 
+      "left": false, 
+      "cls": "", 
+      "target": 2
+    }, 
+    {
+      "right": true, 
+      "uid": "0.2", 
+      "highlighted": false, 
+      "source": 2, 
+      "left": false, 
+      "cls": "", 
+      "target": 0
+    }, 
+    {
+      "right": true, 
+      "uid": "1.2", 
+      "highlighted": false, 
+      "source": 2, 
+      "left": false, 
+      "cls": "", 
+      "target": 1
+    }, 
+    {
+      "right": true, 
+      "uid": "3.2", 
+      "highlighted": false, 
+      "source": 2, 
+      "left": false, 
+      "cls": "", 
+      "target": 3
+    }, 
+    {
+      "right": true, 
+      "uid": "4.1", 
+      "highlighted": false, 
+      "source": 1, 
+      "left": false, 
+      "cls": "", 
+      "target": 4
+    }, 
+    {
+      "right": true, 
+      "uid": "4.0", 
+      "highlighted": false, 
+      "source": 0, 
+      "left": false, 
+      "cls": "", 
+      "target": 4
+    }, 
+    {
+      "right": true, 
+      "uid": "3.0", 
+      "highlighted": false, 
+      "source": 0, 
+      "left": false, 
+      "cls": "", 
+      "target": 3
+    }
+  ], 
+  "topology": "config-star"
+}

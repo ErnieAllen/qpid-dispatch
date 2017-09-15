@@ -1,0 +1,32 @@
+{
+  "nodes": [
+    {
+      "workerThreads": 4, 
+      "weight": 0, 
+      "highlighted": false, 
+      "saslConfigName": "qdrouterd", 
+      "id": 0, 
+      "index": 0, 
+      "raIntervalFlux": 4, 
+      "helloInterval": 1, 
+      "helloMaxAge": 3, 
+      "px": 274, 
+      "py": 72, 
+      "remoteLsMaxAge": 60, 
+      "routerId": "R", 
+      "raInterval": 30, 
+      "cls": "", 
+      "nodeType": "inter-router", 
+      "key": "amqp:/_topo/0/R/$management", 
+      "properties": {}, 
+      "name": "R", 
+      "defaultDistribution": "balanced", 
+      "mode": "standalone", 
+      "y": 72, 
+      "x": 274, 
+      "fixed": 0
+    }
+  ], 
+  "links": [], 
+  "topology": "config-1"
+}

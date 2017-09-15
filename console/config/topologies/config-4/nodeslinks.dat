@@ -1,0 +1,119 @@
+{
+  "nodes": [
+    {
+      "index": 0, 
+      "nodeType": "inter-router", 
+      "name": "R.0", 
+      "weight": 2, 
+      "px": 182.94107236812332, 
+      "py": 39.124510884884394, 
+      "resultIndex": null, 
+      "id": 0, 
+      "routerId": "R.0", 
+      "host": "0.0.0.0:20000", 
+      "highlighted": false, 
+      "key": "amqp:/_topo/0/R.0/$management", 
+      "y": 39.116858474851334, 
+      "x": 182.9302797836822, 
+      "fixed": 0, 
+      "properties": {}, 
+      "cls": ""
+    }, 
+    {
+      "index": 1, 
+      "nodeType": "inter-router", 
+      "name": "R.1", 
+      "weight": 2, 
+      "px": 336.23763109258175, 
+      "py": 47.0512126057414, 
+      "resultIndex": null, 
+      "id": 1, 
+      "routerId": "R.1", 
+      "host": "0.0.0.0:20001", 
+      "highlighted": false, 
+      "key": "amqp:/_topo/0/R.1/$management", 
+      "y": 47.04139468191786, 
+      "x": 336.2445922822722, 
+      "fixed": 0, 
+      "properties": {}, 
+      "cls": ""
+    }, 
+    {
+      "index": 2, 
+      "nodeType": "inter-router", 
+      "name": "R.2", 
+      "weight": 2, 
+      "px": 241.1028597081697, 
+      "py": 181.19635056349873, 
+      "resultIndex": null, 
+      "id": 2, 
+      "routerId": "R.2", 
+      "host": "0.0.0.0:20002", 
+      "highlighted": false, 
+      "key": "amqp:/_topo/0/R.2/$management", 
+      "y": 181.20616481711878, 
+      "x": 241.09589789171804, 
+      "fixed": 0, 
+      "properties": {}, 
+      "cls": ""
+    }, 
+    {
+      "index": 3, 
+      "nodeType": "inter-router", 
+      "name": "R.3", 
+      "weight": 2, 
+      "px": 394.40705833459896, 
+      "py": 189.09470884106995, 
+      "resultIndex": null, 
+      "id": 3, 
+      "routerId": "R.3", 
+      "host": "0.0.0.0:20003", 
+      "highlighted": false, 
+      "key": "amqp:/_topo/0/R.3/$management", 
+      "y": 189.1023649213065, 
+      "x": 394.4178515458012, 
+      "fixed": 0, 
+      "properties": {}, 
+      "cls": ""
+    }
+  ], 
+  "links": [
+    {
+      "right": true, 
+      "uid": "1.0", 
+      "highlighted": false, 
+      "source": 0, 
+      "left": false, 
+      "cls": "", 
+      "target": 1
+    }, 
+    {
+      "right": true, 
+      "uid": "2.0", 
+      "highlighted": false, 
+      "source": 0, 
+      "left": false, 
+      "cls": "", 
+      "target": 2
+    }, 
+    {
+      "right": true, 
+      "uid": "3.1", 
+      "highlighted": false, 
+      "source": 1, 
+      "left": false, 
+      "cls": "", 
+      "target": 3
+    }, 
+    {
+      "right": true, 
+      "uid": "3.2", 
+      "highlighted": false, 
+      "source": 2, 
+      "left": false, 
+      "cls": "", 
+      "target": 3
+    }
+  ], 
+  "topology": "config-4"
+}
