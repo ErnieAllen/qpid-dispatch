@@ -67,7 +67,7 @@ class ListenerSection(ConfigSection):
         self.setEntry("port", port)
 
 class ConnectorSection(ConfigSection):
-    defaults = {"role": "inter-router",
+    defaults = {"role": "normal",
                 "host": "0.0.0.0",
                 "saslMechanisms": 'ANONYMOUS'
                 }

@@ -116,55 +116,45 @@ class Manager(object):
         topology = request["topology"]
         nodes = []
         links = []
-        conn_ports = {}
 
         dc = DirectoryConfigs('./' + self.base + topology + '/')
         configs = dc.configs
 
+        port_map = []
         for index, file in enumerate(configs):
+            port_map.append({'connectors': [], 'listeners': []})
             node = {}
-            sections = {}
             for sect in configs[file]:
                 section = dc.asSection(sect)
                 if section:
                     if section.type == "router":
-                        name = section.entries["id"]
                         node["index"] = index
                         node["nodeType"] = unicode("inter-router")
-                        node["name"] = name
-                        node["routerId"] = name
-                        node["key"] = "amqp:/_topo/0/" + name + "/$management"
+                        node["name"] = section.entries["id"]
+                        node["key"] = "amqp:/_topo/0/" + node["name"] + "/$management"
                         nodes.append(node)
 
-                    if section.type == "connector":
-                        # keep a map of port:node-index so we can link the nodes in the next loop
-                        conn_ports[section.entries["port"]] = index
+                    elif section.type in sectionKeys:
+                        role = section.entries.get('role')
+                        if role == 'inter-router':
+                            # we are processing an inter-router listener or connector: so create a link
+                            port = section.entries.get('port', 'amqp')
+                            if section.type == 'listener':
+                                port_map[index]['listeners'].append(port)
+                            else:
+                                port_map[index]['connectors'].append(port)
+                        else:
+                            if section.type+'s' not in node:
+                                node[section.type+'s'] = {}
+                            key = sectionKeys[section.type]
+                            val = section.entries.get(key)
+                            node[section.type+'s'][val] = section.entries
 
-                    if section.type in sectionKeys:
-                        sectionKey = sectionKeys[section.type]
-                        if sectionKey in section.entries:
-                            if not section.type in sections:
-                                sections[section.type] = {}
-                            nodeSection = sections[section.type]
-                            nodeSection[section.entries[sectionKey]] = section.entries
-
-            for sectionKey in sections:
-                if sectionKey == "listener" or sectionKey == "connector":
-                    key = sections[sectionKey].keys()[0]
-                    if "role" in sections[sectionKey][key] and sections[sectionKey][key]["role"] == "inter-router":
-                        continue
-                node[sectionKey+'s'] = sections[sectionKey]
-
-        for index, file in enumerate(configs):
-            for sect in configs[file]:
-                section = dc.asSection(sect)
-                if sect[0] == "listener":
-                    if section.entries["port"] in conn_ports:
-                        link = {}
-                        link["dir"] = unicode("out")
-                        link["source"] = conn_ports[section.entries["port"]]
-                        link["target"] = index
-                        links.append(link)
+        for source, ports_for_this_routers in enumerate(port_map):
+            for listener_port in ports_for_this_routers['listeners']:
+                for target, ports_for_other_routers in enumerate(port_map):
+                    if listener_port in ports_for_other_routers['connectors']:
+                        links.append({'source': source, 'target': target, 'dir': unicode("in")})
 
         return {"nodes": nodes, "links": links, "topology": topology}
 
@@ -198,6 +188,11 @@ class Manager(object):
         links = request["links"]
         topology = request["topology"]
         settings = request["settings"]
+        #nodes.sort(key=lambda x: x.get('name')) would also need to rearrange the links to match the original node indexes
+
+        if nodeIndex and nodeIndex >= len(nodes):
+            return "Node index out of range"
+
         class StringFile(object):
             def __init__(self):
                 self.s = ""
@@ -224,46 +219,37 @@ class Manager(object):
                     print "Removing", f
                 os.remove(f)
 
-        #with open(self.base + topology + "/nodeslinks.dat", "w+") as fp:
-        #    fp.write(json.dumps({"nodes": nodes, "links": links, "topology": topology}, indent=2))
+        http_port = settings.get('http_port', 5675)
+        listen_port = 2000
+        for link in links:
+            s = nodes[link['source']]
+            t = nodes[link['target']]
+            # keep track of names so we can print them above the sections
+            if 'listen_from' not in s:
+                s['listen_from'] = []
+            if 'conn_to' not in t:
+                t['conn_to'] = []
+            if 'conns' not in t:
+                t['conns'] = []
 
-        http_port = 5675
-        conn_port = 21000
-        host = "0.0.0.0"
-        clients = {}
-        connectionId = 1
+            # make sure source node has a listener
+            lport = listen_port
+            s['listen_from'].append(t['name'])
+            if 'listener' not in s:
+                s['listener'] = listen_port
+                listen_port += 1
+            else:
+                lport = s['listener']
 
-        for node in nodes:
-            node["port_map"] = {}   # used to ensure connectors/listeners between routers use the correct port
-
-        # cache any connections and links for clients first
-        for node in nodes:
-            if node['nodeType'] != 'inter-router':
-                if not node['key'] in clients:
-                    clients[node['key']] = {"connections": [], "links": [], "addresses": []}
-
-                for normal in node["normals"]:
-                    clients[node['key']]["connections"].append(Connection(node, connectionId).vals())
-                    ldir = "in" if node['cdir'] == "in" else "out"
-                    owningAddr = "M0" + normal['addr'] if "console_identifier" not in node['properties'] else ""
-                    clients[node['key']]["links"].append(RouterLink(node, str(len(clients[node['key']]["links"])),
-                                                                    ldir, owningAddr, "endpoint", connectionId).vals())
-                    if node['cdir'] == "both":
-                        otherAddr = "M0" + normal['addr'] if "console_identifier" not in node['properties'] \
-                            else "Ltemp." + id_generator(15)
-                        clients[node['key']]["links"].append(RouterLink(node,
-                                                                        str(len(clients[node['key']]["links"])), "in",
-                                                                        otherAddr, "endpoint", connectionId).vals())
-                    connectionId += 1
-
+            t['conns'].append(lport)
+            t['conn_to'].append(s['name'])
 
         # now process all the routers
-        for idx, node in enumerate(nodes):
+        for node in nodes:
             if node['nodeType'] == 'inter-router':
                 if self.verbose:
                     print "------------- processing node", node["name"], "---------------"
 
-                # this should be driven by the schema and not hard coded like this
                 nname = node["name"]
                 if nodeIndex is None:
                     config_fp = open(self.base + topology + "/" + nname + ".conf", "w+")
@@ -272,38 +258,12 @@ class Manager(object):
 
                 # add a router section in the config file
                 r = RouterSection(**node)
-                if len(links) == 0:
+                if not node.get('conns') and not node.get('listener'):
                     r.setEntry('mode', 'standalone')
+                else:
+                    r.setEntry('mode', 'interior')
                 r.setEntry('id', node['name'])
                 config_fp.write(str(r) + "\n")
-
-                # find all the other nodes that are linked to this node
-                nodeCons = []
-                # if the link source or target is this node's id
-                for link in links:
-                    # only process links to other routers. "small" links cls is for a broker and not a router
-                    if link['cls'] != "small":
-                        toNode = None
-                        fromNode = None
-                        if nodes[link['target']]['name'] == node['name']:
-                            toNode = nodes[link['target']]
-                            fromNode = nodes[link['source']]
-                            toNode["cdir"] = "in"
-                            print "processing links from " + toNode["name"]
-                        if nodes[link['source']]['name'] == node['name']:
-                            toNode = nodes[link['source']]
-                            fromNode = nodes[link['target']]
-                            toNode["cdir"] = "out"
-                            print "processing links to " + toNode["name"]
-                        if toNode:
-                            toNode["container"] = fromNode["name"]
-                            if toNode["name"] not in fromNode["port_map"]:
-                                fromNode['port_map'][toNode["name"]] = str(conn_port)
-                                toNode['port_map'][fromNode["name"]] = str(conn_port)
-                                conn_port += 1
-                            toNode["host"] = host + ':' + fromNode['port_map'][toNode["name"]]
-                            nodeCons.append(toNode)
-                            connectionId += 1
 
                 # write other sections
                 for sectionKey in sectionKeys:
@@ -312,32 +272,25 @@ class Manager(object):
                             o = node[sectionKey+'s'][k]
                             cname = sectionKey[0].upper() + sectionKey[1:] + "Section"
                             c = get_class(cname)
-                            if sectionKey == "listener" and int(o['port']) == http_port:
-                                http_port = None
+                            if sectionKey == "listener" and o['port'] != 'amqp' and int(o['port']) == http_port:
                                 config_fp.write("\n# Listener for a console\n")
                             config_fp.write(str(c(**o)) + "\n")
 
-                # add an http listener (unless an http listener is already added)
-                if http_port is not None and settings["http"]:
-                    l = {"http": True}
-                    config_fp.write("\n# Listener for a console\n")
-                    config_fp.write(str(ListenerSection(http_port, **l)) + "\n")
-                    http_port = None
+                if 'listener' in node:
+                    listenerSection = ListenerSection(node['listener'], **{'host': '0.0.0.0', 'role': 'inter-router'})
+                    if 'listen_from' in node and len(node['listen_from']) > 0:
+                        config_fp.write("\n# listener for connectors from " + ', '.join(node['listen_from']) + "\n")
+                    config_fp.write(str(listenerSection) + "\n")
 
-                if nodeCons:
-                    config_fp.write("\n# Connectors/Listeners for inter-router communication\n")
-                for toNode in nodeCons:
-                    dir = toNode['cdir']
-                    connhost, connport = toNode['host'].split(":")
-                    if dir == "out":
-                        connectorSection = ConnectorSection(connport, **{'host': connhost, 'role': 'inter-router'})
+                if 'conns' in node:
+                    for idx, conn_port in enumerate(node['conns']):
+                        connectorSection = ConnectorSection(conn_port, **{'host': '0.0.0.0', 'role': 'inter-router'})
+                        if 'conn_to' in node and len(node['conn_to']) > idx:
+                            config_fp.write("\n# connect to " + node['conn_to'][idx] + "\n")
                         config_fp.write(str(connectorSection) + "\n")
-                    if dir == "in":
-                        listenerSection = ListenerSection(connport, **{'host': connhost, 'role': 'inter-router'})
-                        config_fp.write(str(listenerSection) + "\n")
 
                 # return requested config file as string
-                if idx == nodeIndex:
+                if node.get('index', -1) == nodeIndex:
                     return str(config_fp)
                 config_fp.close()
 

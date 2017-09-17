@@ -27,70 +27,11 @@ under the License.
             <div class="selected-node pull-right">
                 <button class="btn btn-primary" type="button" ng-click="addAnotherNode(true)"><b class="plus caret"></b> Add new router</button>
                 <button id="action_button" class="btn btn-primary" type="button" ng-disabled="!selected_node" ng-click="showActions($event)">Actions <b class="down caret"></b></button> on selected router
-                <div id="action_menu" class="contextMenu">
-                    <ul>
-                        <li ng-click="editSection(selected_node, 'router')">Edit router info</li>
-
-                        <li class="context-separator"></li>
-                        <li ng-click="editSection(selected_node, 'log', 'new')">Add new log section</li>
-                        <li ng-repeat="log in selected_node.logKeys" ng-click="editSection(selected_node, 'log', log)">Edit/Delete {{log}} log section</li>
-
-                        <li class="context-separator"></li>
-                        <li ng-click="editSection(selected_node, 'sslProfile', 'new')">Add new sslProfile section</li>
-                        <li ng-repeat="ssl in selected_node.sslProfileKeys" ng-click="editSection(selected_node, 'sslProfile', ssl)">Edit/Delete {{ssl}} sslProfile section</li>
-
-                        <li class="context-separator"></li>
-                        <li ng-click="editSection(selected_node, 'connector', 'new')">Add new connector section</li>
-                        <li ng-repeat="connector in selected_node.connectorKeys" ng-click="editSection(selected_node, 'connector', connector)">Edit/Delete {{connector}} connector section</li>
-
-                        <li class="context-separator"></li>
-                        <li ng-click="editSection(selected_node, 'listener', 'new')">Add new listener section</li>
-                        <li ng-repeat="listener in selected_node.listenerKeys" ng-click="editSection(selected_node, 'listener', listener)">Edit/Delete listener on port {{listener}} </li>
-
-                        <li class="context-separator"></li>
-                        <li ng-click="delNode(selected_node)">Delete this node</li>
-                        <li ng-click="showConfig(selected_node)">Show generated config</li>
-                    </ul>
-                </div>
             </div>
         </div>
-            <!--
-        <ul class="nav nav-tabs ng-scope qdrTopoModes">
-            <li ng-repeat="mode in modes" ng-class="{active : isModeActive(mode.name), 'pull-right' : isRight(mode)}" ng-click="selectMode('{{mode.name}}')" >
-                <a data-placement="bottom" class="ng-binding"> {{mode.name}} </a></li>
-        </ul>
--->
         <div id="topology" ng-show="mode == 'Diagram'"><!-- d3 toplogy here --></div>
         <div id="geology" ng-show="mode == 'Globe'"><!-- d3 globe here --></div>
         <div id="crosssection"><!-- d3 pack here --></div>
-        <!-- <div id="addRouter" ng-show="mode == 'Add Node'"></div> -->
-        <div id="node_context_menu" class="contextMenu">
-            <ul>
-                <li ng-class="{'na': contextNode.nodeType !== 'inter-router'}" ng-click="editSection(contextNode, 'router')">Edit router info</li>
-
-                <li ng-class="{'na': contextNode.nodeType !== 'inter-router'}" class="context-separator"></li>
-                <li ng-class="{'na': contextNode.nodeType !== 'inter-router'}" ng-click="editSection(contextNode, 'log', 'new')">Add new log section</li>
-                <li ng-repeat="log in contextNode.logKeys" ng-class="{'na': contextNode.nodeType !== 'inter-router'}" ng-click="editSection(contextNode, 'log', log)">Edit/Delete {{log}} log section</li>
-
-                <li ng-class="{'na': contextNode.nodeType !== 'inter-router'}" class="context-separator"></li>
-                <li ng-class="{'na': contextNode.nodeType !== 'inter-router'}" ng-click="editSection(contextNode, 'sslProfile', 'new')">Add new sslProfile section</li>
-                <li ng-repeat="ssl in contextNode.sslProfileKeys" ng-class="{'na': contextNode.nodeType !== 'inter-router'}" ng-click="editSection(contextNode, 'sslProfile', ssl)">Edit/Delete {{ssl}} sslProfile section</li>
-
-                <li ng-class="{'na': contextNode.nodeType !== 'inter-router'}" class="context-separator"></li>
-                <li ng-class="{'na': contextNode.nodeType !== 'inter-router'}" ng-click="editSection(contextNode, 'connector', 'new')">Add new connector section</li>
-                <li ng-repeat="connector in contextNode.connectorKeys" ng-class="{'na': contextNode.nodeType !== 'inter-router'}" ng-click="editSection(contextNode, 'connector', connector)">Edit/Delete {{connector}} connector section</li>
-
-                <li ng-class="{'na': contextNode.nodeType !== 'inter-router'}" class="context-separator"></li>
-                <li ng-class="{'na': contextNode.nodeType !== 'inter-router'}" ng-click="editSection(contextNode, 'listener', 'new')">Add new listener section</li>
-                <li ng-repeat="listener in contextNode.listenerKeys" ng-class="{'na': contextNode.nodeType !== 'inter-router'}" ng-click="editSection(contextNode, 'listener', listener)">Edit/Delete listener on port {{listener}}</li>
-
-           <!-- <li ng-class="{'na': contextNode.nodeType !== 'inter-router'}" ng-click="addToNode('Artemis')">Add route to an Artemis broker</li>
-                <li ng-class="{'na': contextNode.nodeType !== 'inter-router'}" ng-click="addToNode('Qpid')">Add route to a Qpid broker</li> -->
-                <li ng-class="{'na': contextNode.nodeType !== 'inter-router'}" class="context-separator"></li>
-                <li ng-click="delNode(contextNode)">Delete this node</li>
-                <li ng-click="showConfig(contextNode)">Show generated config</li>
-            </ul>
-        </div>
         <div id="svg_context_menu" class="contextMenu">
             <ul>
                 <li ng-click="addAnotherNode()">Add a new router</li>
@@ -101,10 +42,42 @@ under the License.
                 <li ng-click="reverseLink()">Reverse connection direction</li>
                 <li ng-click="removeLink()">Remove connection</li>
                 <li class="context-separator"></li>
-                <li ng-click="linkConfig()">Set link port, ssl etc.</li>
+                <li ng-click="linkConfig()">Set port for connection.</li>
             </ul>
         </div>
-        <!--<div id="svg_legend"></div> -->
+        <div id="svg_legend"></div>
+    <div id="action_menu" class="contextMenu">
+        <ul>
+            <li ng-click="editSection(selected_node, 'router')">Edit router info</li>
+
+            <li class="context-separator"></li>
+            <li ng-click="editSection(selected_node, 'log', 'new')">Add new log section</li>
+            <li ng-repeat="log in getSectionList(selected_node, 'log')" ng-click="editSection(selected_node, 'log', log)">Edit/Delete {{log}} log section</li>
+
+            <li class="context-separator"></li>
+            <li ng-click="editSection(selected_node, 'sslProfile', 'new')">Add new sslProfile section</li>
+            <li ng-repeat="ssl in getSectionList(selected_node, 'sslProfile')" ng-click="editSection(selected_node, 'sslProfile', ssl)">Edit/Delete {{ssl}} sslProfile section</li>
+
+            <li class="context-separator"></li>
+            <li ng-click="editSection(selected_node, 'connector', 'new')">Add new connector section</li>
+            <li ng-repeat="connector in getSectionList(selected_node, 'connector')" ng-click="editSection(selected_node, 'connector', connector)">Edit/Delete {{connector}} connector section</li>
+
+            <li class="context-separator"></li>
+            <li ng-click="editSection(selected_node, 'listener', 'new')">Add new listener section</li>
+            <li ng-if="!hasConsoleListener()" ng-click="addConsoleListener(selected_node)">Add listener for console</li>
+            <li ng-if="hasConsoleListener(selected_node)" ng-click="delConsoleListener(selected_node)">Delete listener for console</li>
+            <li ng-repeat="listener in getSectionList(selected_node, 'listener')" ng-click="editSection(selected_node, 'listener', listener)">Edit/Delete listener on port {{listener}} </li>
+
+            <li class="context-separator"></li>
+            <li ng-click="delNode(selected_node)">Delete this node</li>
+            <li ng-click="showConfig(selected_node)">Show generated config</li>
+        </ul>
+    </div>
+    <div id="client_context_menu" class="contextMenu">
+        <ul>
+            <li ng-click="delNode(selected_node)">Delete</li>
+        </ul>
+    </div>
 </div>
 
 
@@ -234,7 +207,7 @@ under the License.
         </form>
     </div>
     <div class="modal-footer">
-        <button class="btn btn-primary" type="button" ng-click="setSettings()">OK</button>
+        <button class="btn btn-primary" type="submit" ng-click="setSettings()">OK</button>
         <button class="btn btn-warning" type="button" ng-click="cancel()">Cancel</button>
     </div>
 </script>
