@@ -394,7 +394,7 @@ li.currentStep {
 }
 
 .attr-type {
-    color: #990;
+    color: #330;
     font-size: 85%;
 }
 .attr-required {
@@ -432,10 +432,6 @@ div.boolean label:first-child {
     float: left;
     margin-right: 1em;
 }
-div.boolean {
-    padding-bottom: 1em;
-}
-
 .entity-fields label {
     font-weight: 600;
     margin-top: 0.5em;

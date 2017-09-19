@@ -100,3 +100,25 @@ span.logo {
 .btn .down.caret:before {
  content:"\f0dd";
 }
+
+.tooltip.edit-tooltip .tooltip-inner {
+  min-width: 25em;
+  color: #880000;
+  background-color: #fcfcfc;
+  box-shadow: 0 6px 12px rgba(0,0,0,.175);
+  border: 1px solid #333333;
+}
+.tooltip.edit-tooltip .tooltip-arrow {
+  /* display: none; */
+  color: $ffff68;
+}
+
+
+.form-input-container {
+  display: inline-block;
+  width: 20em;
+}
+
+div.boolean label {
+  margin-bottom: 0;
+}

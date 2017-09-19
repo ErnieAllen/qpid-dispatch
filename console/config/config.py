@@ -28,6 +28,7 @@ from mock import *
 import SimpleHTTPServer
 import SocketServer
 import json
+import cStringIO
 
 import pdb
 
@@ -35,7 +36,7 @@ def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
 get_class = lambda x: globals()[x]
-sectionKeys = {"log": "module", "sslProfile": "name", "connector": "name", "listener": "port"}
+sectionKeys = {"log": "module", "sslProfile": "name", "connector": "port", "listener": "port"}
 
 # borrowed from qpid-dispatch/python/qpid_dispatch_internal/management/config.py
 def _parse(lines):
@@ -135,6 +136,12 @@ class Manager(object):
                         nodes.append(node)
 
                     elif section.type in sectionKeys:
+                        # look for a host in a listener
+                        if section.type == 'listener':
+                            host = section.entries.get('host')
+                            if host and 'host' not in node:
+                                node['host'] = host
+
                         role = section.entries.get('role')
                         if role == 'inter-router':
                             # we are processing an inter-router listener or connector: so create a link
@@ -188,23 +195,12 @@ class Manager(object):
         links = request["links"]
         topology = request["topology"]
         settings = request["settings"]
-        #nodes.sort(key=lambda x: x.get('name')) would also need to rearrange the links to match the original node indexes
+        http_port = settings.get('http_port', 5675)
+        listen_port = settings.get('internal_port', 2000)
+        default_host = settings.get('default_host', '0.0.0.0')
 
         if nodeIndex and nodeIndex >= len(nodes):
             return "Node index out of range"
-
-        class StringFile(object):
-            def __init__(self):
-                self.s = ""
-
-            def write(self, s):
-                self.s += s
-
-            def close(self):
-                pass
-
-            def __repr__(self):
-                return self.s
 
         if self.verbose:
             if nodeIndex is None:
@@ -219,8 +215,6 @@ class Manager(object):
                     print "Removing", f
                 os.remove(f)
 
-        http_port = settings.get('http_port', 5675)
-        listen_port = 2000
         for link in links:
             s = nodes[link['source']]
             t = nodes[link['target']]
@@ -234,6 +228,7 @@ class Manager(object):
 
             # make sure source node has a listener
             lport = listen_port
+            lhost = s.get('host', default_host)
             s['listen_from'].append(t['name'])
             if 'listener' not in s:
                 s['listener'] = listen_port
@@ -241,7 +236,7 @@ class Manager(object):
             else:
                 lport = s['listener']
 
-            t['conns'].append(lport)
+            t['conns'].append({"port": lport, "host": lhost})
             t['conn_to'].append(s['name'])
 
         # now process all the routers
@@ -254,7 +249,7 @@ class Manager(object):
                 if nodeIndex is None:
                     config_fp = open(self.base + topology + "/" + nname + ".conf", "w+")
                 else:
-                    config_fp = StringFile()
+                    config_fp = cStringIO.StringIO()
 
                 # add a router section in the config file
                 r = RouterSection(**node)
@@ -277,21 +272,27 @@ class Manager(object):
                             config_fp.write(str(c(**o)) + "\n")
 
                 if 'listener' in node:
-                    listenerSection = ListenerSection(node['listener'], **{'host': '0.0.0.0', 'role': 'inter-router'})
+                    lhost = node.get('host', default_host)
+                    listenerSection = ListenerSection(node['listener'], **{'host': lhost, 'role': 'inter-router'})
                     if 'listen_from' in node and len(node['listen_from']) > 0:
                         config_fp.write("\n# listener for connectors from " + ', '.join(node['listen_from']) + "\n")
                     config_fp.write(str(listenerSection) + "\n")
 
                 if 'conns' in node:
-                    for idx, conn_port in enumerate(node['conns']):
-                        connectorSection = ConnectorSection(conn_port, **{'host': '0.0.0.0', 'role': 'inter-router'})
+                    for idx, conns in enumerate(node['conns']):
+                        conn_port = conns['port']
+                        conn_host = conns['host']
+                        connectorSection = ConnectorSection(conn_port, **{'host': conn_host, 'role': 'inter-router'})
                         if 'conn_to' in node and len(node['conn_to']) > idx:
                             config_fp.write("\n# connect to " + node['conn_to'][idx] + "\n")
                         config_fp.write(str(connectorSection) + "\n")
 
                 # return requested config file as string
                 if node.get('index', -1) == nodeIndex:
-                    return str(config_fp)
+                    val = config_fp.getvalue()
+                    config_fp.close()
+                    return val
+
                 config_fp.close()
 
         return "published"

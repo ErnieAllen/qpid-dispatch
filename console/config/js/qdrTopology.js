@@ -29,59 +29,8 @@ var QDR = (function(QDR) {
   QDR.module.controller("QDR.TopologyController", ['$scope', '$rootScope', 'QDRService', '$location', '$timeout', '$uibModal',
     function($scope, $rootScope, QDRService, $location, $timeout, $uibModal) {
 
-      var settings = {baseName: "A", http_port: 5675}
+      var settings = {baseName: "A", http_port: 5673, normal_port: 22000, internal_port: 2000, default_host: "0.0.0.0"}
       var sections = ['log', 'connector', 'sslProfile', 'listener']
-      $scope.clientAddress = "addr1"
-      $scope.panelVisible = true  // show/hide the panel on the left
-      $scope.multiData = []
-      $scope.selectedClient = [];
-      $scope.quiesceState = {}
-      var dontHide = false;
-
-      $( document ).ready(function() {
-
-        d3.select(".qdr-topology.pane.left")
-          .style("left" , "-480px")
-        d3.select(".panel-adjacent")
-          .style("margin-left", "10px")
-        return;
-        var isPaneHidden = localStorage["topoPanel"];
-        if (isPaneHidden) {
-          $scope.panelVisible = false
-          d3.select(".qdr-topology.pane.left")
-            .style("left" , "-380px")
-          d3.select(".panel-adjacent")
-            .style("margin-left", "30px")
-        }
-      });
-      $scope.hideLeftPane = function (duration) {
-        localStorage["topoPanel"] = "hide"
-        d3.select(".qdr-topology.pane.left")
-          .transition().duration(300).ease("sin-in")
-          .style("left" , "-380px")
-
-        d3.select(".panel-adjacent")
-          .transition().duration(300).ease("sin-in")
-          .style("margin-left", "30px")
-          .each("end", function () {
-            resize()
-            $timeout(function () {QDR.log.debug("done with transition. setting scope ");$scope.panelVisible = false})
-          })
-      }
-      $scope.showLeftPane = function () {
-        localStorage.removeItem("topoPanel");
-        d3.select(".qdr-topology.pane.left")
-          .transition().duration(300).ease("sin-out")
-          .style("left" , "0px")
-
-        d3.select(".panel-adjacent")
-          .transition().duration(300).ease("sin-out")
-          .style("margin-left", "430px")
-          .each("end", function () {
-            resize()
-            $timeout(function () {QDR.log.debug("done with transition. setting scope ");$scope.panelVisible = true})
-          })
-      }
 
       $scope.Publish = function () {
         doPublish()
@@ -124,11 +73,23 @@ var QDR = (function(QDR) {
       var switchTopology = function (topology) {
         var props = {topology: topology}
         QDRService.sendMethod("SWITCH", props, function (response) {
+          if ($scope.mockTopologies.indexOf(topology) == -1) {
+            $timeout(function () {$scope.mockTopologies.push(topology)})
+          }
           nodes = []
           links = []
+          var savedPositions = localStorage[topology] ? angular.fromJson(localStorage[topology]) : undefined
           for (var i=0; i<response.nodes.length; ++i) {
             var node = response.nodes[i]
-            var anode = aNode(node.key, node.name, node.nodeType, undefined, nodes.length, 100+i*90, 200+(i % 2 ? -100 : 100), undefined, false)
+            var x = 100+i*90
+            var y = 200+(i % 2 ? -100 : 100)
+            if (savedPositions && node.name in savedPositions) {
+              x = savedPositions[node.name].x
+              y = savedPositions[node.name].y
+            }
+            var anode = aNode(node.key, node.name, node.nodeType, undefined, nodes.length, x, y, undefined, false)
+            if (node['host'])
+              anode['host'] = node['host']
             sections.forEach( function (section) {
               if (node[section+'s']) {
                 anode[section+'s'] = node[section+'s']
@@ -144,11 +105,15 @@ var QDR = (function(QDR) {
           for (var i=0; i<nodes.length; ++i) {
             var node = nodes[i]
             sections.forEach( function (section) {
-              if (node[section+'s']) {
+              if (node[section+'s'] && section !== 'log') {
                 for (var key in node[section+'s']) {
                   var type = section
                   if (section === 'listener' && key == settings.http_port)
                     type = 'console'
+                  if (section === 'connector' && key == 616161 && node['connectors']['616161']['role'] === 'route-container')
+                    type = 'artemis'
+                  if (section === 'connector' && key == 5672 && node['connectors']['5672']['role'] === 'route-container')
+                    type = 'qpid'
                   var sub = genNodeToAdd(node, type, key)
                   nodes.push(sub)
                   var source = node.id
@@ -166,18 +131,6 @@ var QDR = (function(QDR) {
         })
       }
 
-      function sourceTarget(skey, tkey, stype, ttype) {
-        stype = stype || "inter-router"
-        ttype = ttype || "inter-router"
-        var source = nodes.findIndex( function (n) {
-          return (n.key === skey && n.nodeType === stype)
-        })
-        var target = nodes.findIndex ( function (n) {
-          return (n.key === tkey && n.nodeType === ttype)
-        })
-        return {source: source, target: target}
-      }
-
       $scope.Clear = function () {
         nodes = []
         links = []
@@ -188,29 +141,18 @@ var QDR = (function(QDR) {
       $scope.delNode = function (node, skipinit) {
         // loop through all the nodes
         if (node.nodeType !== 'inter-router') {
-          for (var x=0; x<nodes.length; x++) {
-            var n = nodes[x]
-            if (n[node.entity+'s']) {
-              if (node.entityKey in n[node.entity+'s']) {
-                // remove the references to this node
-                delete n[node.entity+'s'][node.entityKey]
-                break
-              }
-            }
-          }
+          var n = findParentNode(node)
+          if (n)
+            delete n[node.entity+'s'][node.entityKey]
         } else {
           var sub_nodes = []
           for (var x=0; x<sections.length; x++) {
             var section = sections[x]
             if (node[section+'s']) {
               for (var sectionKey in node[section+'s']) {
-                for (var i=0; i<nodes.length; i++) {
-                  var n = nodes[i]
-                  if (n.entityKey == sectionKey && n.entity === section) {
-                    sub_nodes.push(n)
-                    break
-                  }
-                }
+                var n = findChildNode(section, sectionKey, node.name)
+                if (n)
+                  sub_nodes.push(n)
               }
             }
           }
@@ -273,28 +215,28 @@ var QDR = (function(QDR) {
         var name = contextNode.name + "." + (clientLen + 1)
         nodeType = "normal"
         var properties = type === 'console' ? {console_identifier: "Dispatch console"} : {}
-        if (type === 'Artemis') {
+        if (type === 'artemis') {
           properties = {product: 'apache-activemq-artemis'}
           nodeType = "route-container"
         }
-        if (type === 'Qpid') {
+        if (type === 'qpid') {
           properties = {product: 'qpid-cpp'}
-          nodeType = "on-demand"
+          nodeType = "route-container"
         }
         var node = aNode(id, name, nodeType, undefined, nodes.length, contextNode.x, contextNode.y - radius - radiusNormal,
                              contextNode.id, false, properties)
+        var entity = type === 'console' ? 'listener' : type
+        entity = (type === 'artemis' || type === 'qpid') ? 'connector' : entity
         node.user = "anonymous"
         node.isEncrypted = false
-        node.host = "0.0.0.0:" + port
         node.connectionId = node.id
         node.cdir = dir
-        node.entity = type === 'console' ? 'listener' : type
+        node.entity = entity
         node.entityKey = entityKey
-        node.normals = [{name: node.name, addr: $scope.clientAddress}]
+        node.normals = [{name: node.name}]
 
         return node
       }
-
 
       var addToNode = function (contextNode, type, key) {
         var node = genNodeToAdd(contextNode, type, key)
@@ -307,17 +249,6 @@ var QDR = (function(QDR) {
         //initLegend()
         restart();
       }
-
-      if (!QDRService.connected) {
-        // we are not connected. we probably got here from a bookmark or manual page reload
-        QDRService.redirectWhenConnected("topology");
-        return;
-      }
-      // we are currently connected. setup a handler to get notified if we are ever disconnected
-      QDRService.addDisconnectAction(function() {
-        QDRService.redirectWhenConnected("topology");
-        $scope.$apply();
-      })
 
       var urlPrefix = $location.absUrl();
       urlPrefix = urlPrefix.split("#")[0]
@@ -405,11 +336,9 @@ var QDR = (function(QDR) {
       }
       $scope.delConsoleListener = function (node) {
         // find the actual console listener
-        var consoles = nodes.filter( function (n) {
-          return n.entity === 'listener' && n.entityKey == settings.http_port
-        })
-        if (consoles.length > 0)
-          $scope.delNode(consoles[0])
+        var n = findChildNode('listener', settings.http_port, node.name)
+        if (n)
+          $scope.delNode(n)
       }
 
       var yoffset = 1
@@ -526,8 +455,34 @@ var QDR = (function(QDR) {
         restart(false);
         tick();
       }
+
+      var findChildNode = function (entity, entityKey, name) {
+        // find the node that has entity and entityKey
+        for (var i=0; i<nodes.length; i++) {
+          if (nodes[i].entity === entity && nodes[i].entityKey == entityKey && nodes[i].routerId === name)
+            return nodes[i]
+        }
+      }
+      var findParentNode = function (node) {
+        // find the node that contains the entity[entityKey] of this node
+        for (var i=0; i<nodes.length; i++) {
+          if (nodes[i][node.entity+'s'] && node.entityKey in nodes[i][node.entity+'s'])
+            return nodes[i]
+        }
+      }
+      // menu item of router to set host of all listeners
+      $scope.setRouterHost = function (node) {
+        doSetRouterHostDialog(node)
+      }
+      // menu item of router to edit one of its sub-entities
       $scope.editSection = function (node, type, section) {
         doEditDialog(node, type, section)
+      }
+      // menu item of sub-entity to edit itself
+      $scope.editThisSection = function (node) {
+        var n = findParentNode(node)
+        if (n)
+          doEditDialog(n, node.entity, node.entityKey)
       }
 
       var mouseX, mouseY;
@@ -633,6 +588,7 @@ var QDR = (function(QDR) {
           x: x,
           y: y,
           id: nodeIndex,
+          host: '0.0.0.0',
           resultIndex: resultIndex,
           cls: name == NewRouterName ? 'temp' : ''
         };
@@ -662,49 +618,15 @@ var QDR = (function(QDR) {
         }
       }
 
-      var getLinkAddr = function (id, connection, onode) {
-        var links = onode[".router.link"]
-        if (!links) {
-          return $scope.clientAddress
-        }
-        links.results.forEach( function (linkResult) {
-          var link = QDRService.flatten(links.attributeNames, linkResult)
-          if (link.linkType === "endpoint" && link.connectionId === connection.identity)
-            return link.owningAddr
-        })
-        return $scope.clientAddress
-      }
-
-      var getLinkDir = function (id, connection, onode) {
-        var links = onode[".router.link"]
-        if (!links) {
-          return "unknown"
-        }
-        var inCount = 0, outCount = 0
-        links.results.forEach( function (linkResult) {
-          var link = QDRService.flatten(links.attributeNames, linkResult)
-          if (link.linkType === "endpoint" && link.connectionId === connection.identity)
-            if (link.linkDir === "in")
-              ++inCount
-            else
-              ++outCount
-        })
-        if (inCount > 0 && outCount > 0)
-          return "both"
-        if (inCount > 0)
-          return "in"
-        if (outCount > 0)
-          return "out"
-        return "unknown"
-      }
-
       var savePositions = function () {
+        var positions = {}
         nodes.forEach( function (d) {
-          localStorage[d.name] = angular.toJson({
+          positions[d.name] = {
             x: Math.round(d.x),
             y: Math.round(d.y)
-          });
+          };
         })
+        localStorage[$scope.mockTopologyDir] = angular.toJson(positions)
       }
 
       // vary the following force graph attributes based on nodeCount
@@ -1096,25 +1018,22 @@ var QDR = (function(QDR) {
 
         var appendTitle = function(g) {
           g.append("svg:title").text(function(d) {
-            var x = '';
-            if (d.normals && d.normals.length > 1)
-              x = " x " + d.normals.length;
             if (QDRService.isConsole(d)) {
-              return 'Dispatch console' + x
+              return 'Dispatch console'
             }
             if (d.properties.product == 'qpid-cpp') {
-              return 'Broker - qpid-cpp' + x
+              return 'Broker - Qpid'
             }
             if (QDRService.isArtemis(d)) {
-              return 'Broker - Artemis' + x
+              return 'Broker - Artemis'
             }
             if (d.cdir === 'in')
-              return 'Listener' + x
+              return 'Listener'
             if (d.cdir === 'out')
-              return 'Connector' + x
+              return 'Connector'
             if (d.cdir === 'both')
-              return 'sslProfile' + x
-            return d.nodeType == 'normal' ? 'client' + x : (d.nodeType == 'on-demand' ? 'broker' : 'Router ' + d.name)
+              return 'sslProfile'
+            return d.nodeType == 'normal' ? 'client' : (d.nodeType == 'route-container' ? 'broker' : 'Router ' + d.name)
           })
         }
 
@@ -1145,20 +1064,7 @@ var QDR = (function(QDR) {
 
         var appendCircle = function(g) {
           // add new circles and set their attr/class/behavior
-          var crcl = g.append('svg:circle')
-
-/*
-          var arc = d3.svg.arc()
-              .innerRadius(50)
-              .outerRadius(70)
-              .startAngle(45 * (Math.PI/180)) //converting from degs to radians
-              .endAngle(3) //just radians
-
-          var crcl = g.append("path")
-              .attr("d", arc)
-*/
-          //return g.append('svg:circle')
-          return crcl
+          return g.append('svg:circle')
             .attr('class', 'node')
             .attr('r', function(d) {
               return radii[d.nodeType]
@@ -1188,7 +1094,7 @@ var QDR = (function(QDR) {
               return d.nodeType == 'inter-router'
             })
             .classed('on-demand', function(d) {
-              return d.nodeType == 'on-demand' || d.nodeType == 'route-container'
+              return d.nodeType == 'route-container'
             })
             .classed('console', function(d) {
               return QDRService.isConsole(d)
@@ -1314,13 +1220,6 @@ var QDR = (function(QDR) {
               return;
             // clicked on a circle
             clearPopups();
-            if (!d.normals) {
-              // circle was a router or a broker
-              if (QDRService.isArtemis(d) && Core.ConnectionName === 'Artemis') {
-                $location.path('/jmx/attributes?tab=artemis&con=Artemis')
-              }
-              return;
-            }
             clickPos = d3.mouse(this);
             d3.event.stopPropagation();
           })
@@ -1430,13 +1329,10 @@ var QDR = (function(QDR) {
           legendNodes.push(node)
         }
         if (!svg.selectAll('circle.qpid-cpp').empty()) {
-          legendNodes.push(aNode("Qpid broker", "", "on-demand", undefined, 5, 0, 0, 0, false, {
-            product: 'qpid-cpp'
-          }))
+          legendNodes.push(genNodeToAdd({key:'Qpid broker', name:'legend', x:0, y:0, id:'legend'}, 'qpid', ''))
         }
         if (!svg.selectAll('circle.artemis').empty()) {
-          legendNodes.push(aNode("Artemis broker", "", "route-container", '', undefined, 6, 0, 0, 0, false,
-          {product: 'apache-activemq-artemis'}))
+          legendNodes.push(genNodeToAdd({key:'Artemis broker', name:'legend', x:0, y:0, id:'legend'}, 'artemis', ''))
         }
         if (!svg.selectAll('circle.route-container').empty()) {
           legendNodes.push(aNode("Service", "", "route-container", 'external-service', undefined, 7, 0, 0, 0, false,
@@ -1540,6 +1436,36 @@ var QDR = (function(QDR) {
         });
       }
 
+      function doSetRouterHostDialog(node) {
+        var d = $uibModal.open({
+          dialogClass: "modal dlg-large",
+          backdrop: true,
+          keyboard: true,
+          backdropClick: true,
+          controller: 'QDR.SetRouterHostDialogController',
+          templateUrl: 'set-router-host.html',
+          resolve: {
+            host: function() {
+              var host = node.host || '0.0.0.0'
+              return host;
+            }
+          }
+        });
+        $timeout(function () {
+          d.result.then(function(result) {
+            if (result) {
+              node.host = result.host
+              // loop through all listeners and set the host
+              if (node.listeners) {
+                for (var listener in node.listeners) {
+                  node.listeners[listener].host = result.host
+                }
+              }
+            }
+          });
+        })
+      }
+
       function doNewDialog() {
         var d = $uibModal.open({
           dialogClass: "modal dlg-large",
@@ -1598,7 +1524,7 @@ var QDR = (function(QDR) {
       }
 
       function doEditDialog(node, entity, context) {
-        var entity2key = {router: 'name', log: 'module', sslProfile: 'name', connector: 'name', listener: 'port'}
+        var entity2key = {router: 'name', log: 'module', sslProfile: 'name', connector: 'port', listener: 'port'}
         var d = $uibModal.open({
           dialogClass: "modal dlg-large",
           backdrop: true,
@@ -1618,6 +1544,22 @@ var QDR = (function(QDR) {
             },
             entityKey: function () {
               return entity2key[entity]
+            },
+            hasLinks: function () {
+              return links.some(function (l) {
+                return l.source.key === node.key || l.target.key === node.key
+              })
+            },
+            maxPort: function () {
+              var maxPort = settings.normal_port
+              nodes.forEach(function (node) {
+                if (node.entity === 'listener' || node.entity === 'connector') {
+                  if (node.entityKey !== 'amqp' && node.entityKey != 616161 && node.entityKey != 5672)
+                    if (parseInt(node.entityKey) > maxPort)
+                      maxPort = parseInt(node.entityKey)
+                }
+              })
+              return maxPort
             }
           }
         });
@@ -1640,29 +1582,27 @@ var QDR = (function(QDR) {
                 var nodeObj = node[entity+'s']
                 if ('del' in result) {
                   // find the 'normal' node that is associated with this entry
-                  for (var i=0; i<nodes.length; i++) {
-                    var n = nodes[i]
-                    if (n.entity === entity && n.entityKey === context) {
-                      $scope.delNode(n)
-                      break
-                    }
-                  }
+                  var n = findChildNode(entity, context, node.name)
+                  if (n)
+                    $scope.delNode(n)
                 } else {
                   var rVals = valFromMapArray(result.entities, "actualName", entity)
                   if (rVals) {
-                      var o = new FormValues(rVals)
-                      if (!angular.isDefined(nodeObj)) {
-                        node[entity+'s'] = {}
-                        nodeObj = node[entity+'s']
-                      }
-                      // we were editing an existing section and the key for that section was changed
-                      else if (o.node[key] !== context && context !== 'new') {
-                        delete nodeObj[context]
-                      }
-                      nodeObj[o.node[key]] = o.node
-                      if (context === 'new') {
-                        addToNode(node, entity, o.node[key])
-                      }
+                    var o = new FormValues(rVals)
+                    if (!angular.isDefined(nodeObj)) {
+                      node[entity+'s'] = {}
+                      nodeObj = node[entity+'s']
+                    }
+                    // we were editing an existing section and the key for that section was changed
+                    else if (o.node[key] !== context && (context !== 'new' && context !== 'artemis' && context != 'qpid')) {
+                      delete nodeObj[context]
+                    }
+                    nodeObj[o.node[key]] = o.node
+                    if (context === 'new' || context === 'artemis' || context === 'qpid') {
+                      if (context !== 'new')
+                        entity = context
+                      addToNode(node, entity, o.node[key])
+                    }
                   }
                 }
               }
@@ -1695,6 +1635,17 @@ var QDR = (function(QDR) {
     }
   ]);
 
+  QDR.module.controller("QDR.SetRouterHostDialogController", function ($scope, $uibModalInstance, host) {
+    $scope.host = host
+    $scope.setSettings = function () {
+      $uibModalInstance.close({host: $scope.host});
+    }
+
+    $scope.cancel = function () {
+      $uibModalInstance.close()
+    }
+  })
+
   QDR.module.controller("QDR.ShowConfigDialogController", function ($scope, $uibModalInstance, config) {
     $scope.config = config
     $scope.ok = function () {
@@ -1719,16 +1670,6 @@ var QDR = (function(QDR) {
     }
   })
 
-  QDR.module.directive('customOnChange', function() {
-    return {
-      restrict: 'A',
-      link: function (scope, element, attrs) {
-        var onChangeHandler = scope.$eval(attrs.customOnChange);
-        element.bind('change', onChangeHandler);
-      }
-    };
-  });
-
   QDR.module.controller("QDR.SettingsDialogController", function($scope, $uibModalInstance, settings) {
     var local_settings = {}
     Object.assign(local_settings, settings)
@@ -1736,15 +1677,10 @@ var QDR = (function(QDR) {
                     attributes: [
                       {name: "baseName", humanName: "Starting router name", input: "input", type: "text", value: local_settings.baseName, required: true},
                       {name: "http", humanName: "Port for console listeners", input: "input", type: "text", value: local_settings.http_port},
-                      //{name: "file", humanName: "Browse for config file folder", input: "file", type: "file", value: "", required: false},
+                      {name: "normal_port", humanName: "Starting port for normal listeners/connectors", input: "input", type: "text", value: local_settings.normal_port},
+                      {name: "internal_port", humanName: "Starting port for inter-router listeners/connectors", input: "input", type: "text", value: local_settings.internal_port},
+                      {name: "default_host", humanName: "Default host for inter-router listeners/connectors", input: "input", type: "text", value: local_settings.default_host},
                     ]}
-
-    $scope.uploadFile = function(e){
-        var theFiles = e.target.files;
-        var relativePath = theFiles[0].webkitRelativePath;
-        var folder = relativePath.split("/");
-        QDR.log.info(folder[0])
-    };
 
     $scope.setSettings = function () {
       var newSettings = {}

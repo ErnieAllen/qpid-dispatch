@@ -66,7 +66,7 @@ var QDR = (function(QDR) {
    *
    * This plugin's angularjs module instance
    */
-  QDR.module = angular.module(QDR.pluginName, ['ngResource', 'ngRoute', 'ngSanitize', 'ui.bootstrap', /*, 'minicolors' */]);
+  QDR.module = angular.module(QDR.pluginName, ['ngAnimate', 'ngResource', 'ngRoute', 'ngSanitize', 'ui.bootstrap']);
 
   Core = {
     notification: function (severity, msg) {
@@ -77,17 +77,8 @@ var QDR = (function(QDR) {
   // set up the routing for this plugin
   QDR.module.config(function($routeProvider) {
     $routeProvider
-      .when('/', {
-        templateUrl: QDR.templatePath + 'qdrConnect.html'
-        })
-      .when('/topology', {
-          templateUrl: QDR.templatePath + 'qdrTopology.html'
-        })
-      .when('/connect', {
-          templateUrl: QDR.templatePath + 'qdrConnect.html'
-        })
       .otherwise({
-          templateUrl: QDR.templatePath + 'qdrConnect.html'
+          templateUrl: QDR.templatePath + 'qdrTopology.html'
         })
   });
 
@@ -135,7 +126,7 @@ var QDR = (function(QDR) {
   QDR.logger = function ($log) {
     var log = $log;
 
-    this.debug = function (msg) { msg = "QDR: " + msg; log.debug(msg)};
+    this.debug = function (msg) { msg = "QDR: " + msg; log.info(msg)};
     this.error = function (msg) {msg = "QDR: " + msg; log.error(msg)}
     this.info = function (msg) {msg = "QDR: " + msg; log.info(msg)}
     this.warn = function (msg) {msg = "QDR: " + msg; log.warn(msg)}
@@ -146,85 +137,15 @@ var QDR = (function(QDR) {
     // of our module
   QDR.module.run( ["$rootScope", '$route', '$timeout', "$location", "$log", "QDRService", function ($rootScope, $route, $timeout, $location, $log, QDRService) {
     QDR.log = new QDR.logger($log);
-    QDR.log.info("*************creating Dispatch Console************");
-    var curPath = $location.path()
-    var org = curPath.substr(1)
-    if (org && org.length > 0 && org !== "connect") {
-      $location.search('org', org)
-    } else {
-      $location.search('org', null)
-    }
-    QDR.queue = d3.queue;
-
-    var settings = angular.fromJson(localStorage[QDR.SETTINGS_KEY]);
-    if (settings && settings.autostart) {
-      QDRService.addDisconnectAction( function () {
-        $timeout(function () {
-          var lastLocation = localStorage[QDR.LAST_LOCATION] || "/overview";
-          org = lastLocation.substr(1)
-          $location.path("/connect");
-          $location.search('org', org)
-        })
-      })
-      QDRService.addConnectAction(function() {
-        QDRService.getSchema(function () {
-          QDR.log.debug("got schema after connection")
-/*
-          QDRService.addUpdatedAction("initialized", function () {
-            QDRService.delUpdatedAction("initialized")
-            QDR.log.debug("got initial topology")
-            $timeout(function() {
-              if ($location.path().startsWith(QDR.pluginRoot)) {
-                  var searchObject = $location.search();
-                  var goto = "overview";
-                  if (searchObject.org && searchObject.org !== "connect") {
-                    goto = searchObject.org;
-                  }
-                  $location.search('org', null)
-                  $location.path(QDR.pluginRoot + "/" + goto);
-              }
-            })
-          })
-          QDR.log.debug("requesting a topology")
-          QDRService.setUpdateEntities([])
-          QDRService.topology.get()
-*/
-        })
-      });
-      QDRService.connect(settings);
-    } else {
-      $timeout(function () {
-        $location.path('/connect')
-        $location.search('org', org)
-      })
-    }
-
-    $rootScope.$on('$routeChangeSuccess', function() {
-      var path = $location.path();
-      if (path !== "/connect") {
-        localStorage[QDR.LAST_LOCATION] = path;
-      }
-    });
-
+    QDR.log.info("*************creating config editor************");
+    QDRService.getSchema(function () {
+      QDR.log.info("got schema")
+    })
   }]);
 
   QDR.module.config(['$qProvider', function ($qProvider) {
       $qProvider.errorOnUnhandledRejections(false);
   }]);
-
-  QDR.module.controller ("QDR.MainController", ['$scope', '$location', function ($scope, $location) {
-    QDR.log.debug("started QDR.MainController with location.url: " + $location.url());
-    QDR.log.debug("started QDR.MainController with window.location.pathname : " + window.location.pathname);
-    $scope.topLevelTabs = [];
-    $scope.topLevelTabs.push({
-      id: "qdr",
-      content: "Qpid Dispatch Router Config Creator/Editor",
-      title: "Dispatch Router Console",
-      isValid: function() { return true; },
-      href: function() { return "#connect"; },
-      isActive: function() { return true; }
-    });
-  }])
 
   QDR.module.controller ("QDR.Core", function ($scope, $rootScope) {
     $scope.alerts = [];

@@ -55,14 +55,8 @@ under the License.
         <uib-alert ng-repeat="alert in alerts" type="{{alert.type}}">{{alert.msg}}</uib-alert>
     </div>
 
-    <nav class="navbar navbar-default navbar-pf" role="navigation" ng-controller="QDR.MainController">
+    <nav class="navbar navbar-default navbar-pf" role="navigation">
         <div class="navbar-header">
-            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse-1">
-                <span class="sr-only">Toggle navigation</span>
-                <span class="icon-bar"></span>
-                <span class="icon-bar"></span>
-                <span class="icon-bar"></span>
-            </button>
             <a class="navbar-brand" href="/">
                 <span class="logo">Qpid Dispatch config file processor</span>
             </a>
@@ -76,32 +70,6 @@ under the License.
             </div>
         </div>
     </div>
-
-
-<!--
-    <div id="main-nav" class="navbar navbar-fixed-top" ng-controller="QDR.MainController">
-        <div class="navbar-inner main-nav-lower">
-            <div class="container">
-                <div class="pull-left">
-                    <ul class="nav">
-                        <li ng-repeat="nav in topLevelTabs track by $index"
-                            ng-class="{active : !nav.isActive()}"
-                            ng-show="nav.isValid()">
-                            <a ng-href="{{nav.href}}" title="{{nav.title}}" data-placement="bottom" ng-bind="nav.content">
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="main-body" >
-        <div id="main" class="container-fluid ng-cloak qdr">
-            <div ng-include src="'html/qdrLayout.html'"></div>
-        </div>
-    </div>
--->
 
 </div>
 
@@ -121,6 +89,7 @@ under the License.
 <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.2/angular.js"></script>
 <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.2/angular-route.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.6.2/angular-resource.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.6.2/angular-animate.min.js"></script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/angular-ui-bootstrap/0.14.3/ui-bootstrap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/angular-ui-bootstrap/0.14.3/ui-bootstrap-tpls.min.js"></script>
@@ -146,7 +115,6 @@ under the License.
 <script type="text/javascript" src="js/qdrTopology.js"></script>
 <script type="text/javascript" src="js/qdrNewNode.js"></script>
 <script type="text/javascript" src="js/qdrSettings.js"></script>
-<script type="text/javascript" src="lib/rhea-min.js"></script>
 
 
 <script type="text/javascript">

@@ -49,6 +49,7 @@ under the License.
     <div id="action_menu" class="contextMenu">
         <ul>
             <li ng-click="editSection(selected_node, 'router')">Edit router info</li>
+            <li ng-click="setRouterHost(selected_node)">Set router host</li>
 
             <li class="context-separator"></li>
             <li ng-click="editSection(selected_node, 'log', 'new')">Add new log section</li>
@@ -60,6 +61,8 @@ under the License.
 
             <li class="context-separator"></li>
             <li ng-click="editSection(selected_node, 'connector', 'new')">Add new connector section</li>
+            <li ng-click="editSection(selected_node, 'connector', 'artemis')">Add new connector for Artemis broker</li>
+            <li ng-click="editSection(selected_node, 'connector', 'qpid')">Add new connector for Qpid broker</li>
             <li ng-repeat="connector in getSectionList(selected_node, 'connector')" ng-click="editSection(selected_node, 'connector', connector)">Edit/Delete {{connector}} connector section</li>
 
             <li class="context-separator"></li>
@@ -76,26 +79,14 @@ under the License.
     <div id="client_context_menu" class="contextMenu">
         <ul>
             <li ng-click="delNode(selected_node)">Delete</li>
+            <li class="context-separator"></li>
+            <li ng-click="editThisSection(selected_node)">Edit</li>
         </ul>
     </div>
+    <span ng-init="setUnloadWarning()"></span>
 </div>
 
 
-<script type="text/ng-template" id="titleHeaderCellTemplate.html">
-    <div title="{{col.displayName}}" class="ngHeaderSortColumn {{col.headerClass}}" ng-style="{'cursor': col.cursor}" ng-class="{ 'ngSorted': !noSortVisible }">
-        <div ng-click="col.sort($event)" ng-class="'colt' + col.index" class="ngHeaderText">{{col.displayName}}</div>
-        <div class="ngSortButtonDown" ng-show="col.showSortButtonDown()"></div>
-        <div class="ngSortButtonUp" ng-show="col.showSortButtonUp()"></div>
-        <div class="ngSortPriority">{{col.sortPriority}}</div>
-    </div>
-</script>
-<script type="text/ng-template" id="titleCellTemplate.html">
-    <div title="{{row.entity[col.field]}}" class="ngCellText">{{row.entity[col.field]}}</div>
-</script>
-
-<!--
-    This is the template for the node edit dialog that is displayed.
--->
 <script type="text/ng-template" id="settings-template.html">
     <div class="modal-header">
         <h3 class="modal-title">Global settings</h3>
@@ -134,47 +125,42 @@ under the License.
 </script>
 
 
+<!--
+    This is the template for the node add/edit dialog
+-->
 <script type="text/ng-template" id="node-config-template.html">
+    <form novalidate name="editForm" ng-submit="save()">
     <div class="modal-header">
         <h3 class="modal-title">{{title}}</h3>
     </div>
     <div class="modal-body">
-        <form novalidate name="editForm">
 
             <fieldset>
-                <div ng-mouseenter="showDescription(attribute, $event)" ng-repeat="attribute in entities[0].attributes">
-                    <label class="form-label" for="{{attribute.name}}">{{attribute.humanName}}</label>
-                    <!-- we can't do <input type="{angular expression}"> because... jquery throws an exception because... -->
-                    <div ng-if="attribute.input == 'input'">
-                        <!-- ng-pattern="testPattern(attribute)" -->
-                        <input class="edit_input" ng-if="attribute.type == 'number'" type="number" name="{{attribute.name}}" id="{{attribute.name}}" ng-model="attribute.value" ng-required="attribute.required" class="ui-widget-content ui-corner-all"/>
-                        <input class="edit_input" ng-if="attribute.type == 'text'" type="text" name="{{attribute.name}}" id="{{attribute.name}}" ng-model="attribute.value" ng-required="attribute.required" class="ui-widget-content ui-corner-all"/>
-                    </div>
-                    <div ng-if="attribute.input == 'select'">
-                        <select class="edit_input" id="{{attribute.name}}" ng-model="attribute.selected" ng-options="item for item in attribute.rawtype"></select>
-                    </div>
-                    <div ng-if="attribute.input == 'boolean'" class="boolean">
-                        <label><input type="radio" ng-model="attribute.value" value="true"> True</label>
-                        <label><input type="radio" ng-model="attribute.value" value="false"> False</label>
+                <div ng-repeat="attribute in entities[0].attributes">
+                    <div ng-click="tooltipIsOpen = !tooltipIsOpen" class="form-input-container" tooltip-is-open="tooltipIsOpen" tooltip-append-to-body="true" tooltip-placement="right" uib-tooltip-html="attributeDescription" ng-mouseenter="setDescription(attribute, $event)" tooltip-class="edit-tooltip">
+                        <label class="form-label" for="{{attribute.name}}">{{attribute.humanName}}</label>
+                        <div ng-if="attribute.input == 'input'">
+                            <input class="edit_input" ng-if="attribute.type == 'number'" type="number" name="{{attribute.name}}" id="{{attribute.name}}" ng-model="attribute.value" ng-required="attribute.required" class="ui-widget-content ui-corner-all"/>
+                            <input class="edit_input" ng-if="attribute.type == 'text'" type="text" name="{{attribute.name}}" id="{{attribute.name}}" ng-model="attribute.value" ng-required="attribute.required" class="ui-widget-content ui-corner-all"/>
+                        </div>
+                        <div ng-if="attribute.input == 'select'">
+                            <select class="edit_input" id="{{attribute.name}}" ng-model="attribute.selected" ng-options="item for item in attribute.rawtype"></select>
+                        </div>
+                        <div ng-if="attribute.input == 'boolean'" class="boolean">
+                            <label><input type="radio" ng-model="attribute.value" value="true"> True</label>
+                            <label><input type="radio" ng-model="attribute.value" value="false"> False</label>
+                        </div>
                     </div>
                 </div>
             </fieldset>
-        </form>
     </div>
     <div class="modal-footer">
-        <button class="btn btn-primary" type="button" ng-click="save()">OK</button>
-        <button ng-if="context !== 'new'" class="btn btn-secondary" type="button" ng-click="del()">Delete</button>
+        <button class="btn btn-primary" type="submit" ng-disabled="editForm.$invalid" ng-click="save()">OK</button>
+        <button ng-if="showDelete()" class="btn btn-secondary" type="button" ng-click="del()">Delete</button>
         <button class="btn btn-warning" type="button" ng-click="cancel()">Cancel</button>
     </div>
-    <div class="attr-description">{{attributeDescription}}
-        <div class="attr-type">{{attributeType}}</div>
-        <div class="attr-required">{{attributeRequired}}</div>
-        <div class="attr-unique">{{attributeUnique}}</div>
-    </div>
+    </form>
 </script>
-
-
-
 
 <script type="text/ng-template" id="show-config-template.html">
     <div class="modal-header">
@@ -212,3 +198,24 @@ under the License.
     </div>
 </script>
 
+<script type="text/ng-template" id="set-router-host.html">
+    <div class="modal-header">
+        <h3 class="modal-title">Set router host</h3>
+    </div>
+    <div class="modal-body">
+        <div class="description">
+            Set the host of all listeners on this router. Also ensure that all internal connectors to this router use this host.
+        </div>
+        <form novalidate name="editForm">
+            <label for="host" class="entity-description">Enter a new topology directory name</label>
+            <fieldset>
+                <input type="text" name="host" id="host" ng-model="host" ng-required="true" class="ui-widget-content ui-corner-all"/>
+            </fieldset>
+
+        </form>
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-primary" type="submit" ng-click="setSettings()">OK</button>
+        <button class="btn btn-warning" type="button" ng-click="cancel()">Cancel</button>
+    </div>
+</script>
