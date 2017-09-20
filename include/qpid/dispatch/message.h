@@ -36,6 +36,16 @@
  * @{
  */
 
+// DISPATCH-807 Queue depth limits
+// upper and lower limits for bang bang hysteresis control
+//
+// Q2 defines the number of buffers allowed in a message's buffer chain
+#define QD_QLIMIT_Q2_UPPER 256
+#define QD_QLIMIT_Q2_LOWER 128
+//
+// Q3 defines the number of bytes allowed in a session's outgoing_bytes
+#define QD_QLIMIT_Q3_UPPER (256 * 1000)
+
 // Callback for status change (confirmed persistent, loaded-in-memory, etc.)
 
 typedef struct qd_message_t qd_message_t;
@@ -215,8 +225,10 @@ qd_message_t *qd_message_receive(pn_delivery_t *delivery);
  *
  * @param msg A pointer to a message to be sent.
  * @param link The outgoing link on which to send the message.
+ * @param strip_outbound_annotations [in] annotation control flag
+ * @param restart_rx [out] indication to wake up receive process
  */
-void qd_message_send(qd_message_t *msg, qd_link_t *link, bool strip_outbound_annotations);
+void qd_message_send(qd_message_t *msg, qd_link_t *link, bool strip_outbound_annotations, bool *restart_rx);
 
 /**
  * Check that the message is well-formed up to a certain depth.  Any part of the message that is
@@ -350,6 +362,47 @@ size_t qd_message_fanout(qd_message_t *msg);
  * @param msg A pointer to the message.
  */
 void qd_message_add_fanout(qd_message_t *msg);
+
+/**
+ * Setter for message Q2 input_holdoff state
+ *
+ * @param msg A pointer to the message
+ */
+void qd_message_set_Q2_input_holdoff(qd_message_t *msg, bool holdoff);
+
+/**
+ * Accessor for message Q2 input_holdoff state
+ *
+ * @param msg A pointer to the message
+ * @return true if input is being held off
+ */
+bool qd_message_get_Q2_input_holdoff(qd_message_t *msg);
+
+/**
+ * Test if attempt to retreive message data through qd_message_recv should block
+ * due to Q2 input holdoff limit being exceeded. This message has enough
+ * buffers in the internal buffer chain and any calls to to qd_message_receive
+ * will not result in a call to pn_link_receive to retrieve more data.
+ *
+ * @param msg A pointer to the message
+ */
+bool qd_message_Q2_holdoff_should_block(qd_message_t *msg);
+
+/**
+ * Test if a message that is blocked by Q2 input holdoff has enough room
+ * to begin receiving again. This message has transmitted and disposed of
+ * enough buffers to begin receiving more data from the underlying proton link.
+ *
+ * @param msg A pointer to the message
+ */
+bool qd_message_Q2_holdoff_should_unblock(qd_message_t *msg);
+
+/**
+ * Return qd_link through which the message is being received.
+ * @param msg A pointer to the message
+ * @return the qd_link
+ */
+qd_link_t * qd_message_get_receiving_link(const qd_message_t *msg);
 
 ///@}
 

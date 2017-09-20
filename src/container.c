@@ -172,7 +172,7 @@ static void do_receive(pn_delivery_t *pnd)
     if (link) {
         qd_node_t *node = link->node;
         if (node) {
-            node->ntype->rx_handler(node->context, link, pnd);
+            node->ntype->rx_handler(node->context, link);
             return;
         }
     }
@@ -893,3 +893,7 @@ bool qd_link_drain_changed(qd_link_t *link, bool *mode)
 }
 
 
+void *qd_link_get_node_context(const qd_link_t *link)
+{
+    return (link && link->node) ? link->node->context : 0;
+}

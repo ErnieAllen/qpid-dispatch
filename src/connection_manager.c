@@ -189,29 +189,7 @@ static void load_strip_annotations(qd_server_config_t *config, const char* strip
  */
 static void set_config_host(qd_server_config_t *config, qd_entity_t* entity)
 {
-    char *host = qd_entity_opt_string(entity, "host", 0);
-    char *addr = qd_entity_opt_string(entity, "addr", 0);
-
-    if (host && addr && strcmp(host, "") == 0 && strcmp(addr, "") == 0) {
-        config->host = host;
-        free(addr);
-    }
-    else if (host && addr && strcmp(host, addr) != 0 && strcmp(host, "127.0.0.1") == 0) {
-        config->host = addr;
-        free(host);
-    }
-    else if (host && strcmp(host, "") != 0 ) {
-        config->host = host;
-        free(addr);
-    }
-    else if (addr && strcmp(addr, "") != 0) {
-        config->host = addr;
-        free(host);
-    }
-    else {
-        free(host);
-        free(addr);
-    }
+    config->host = qd_entity_opt_string(entity, "host", 0);
 
     assert(config->host);
 
@@ -313,8 +291,6 @@ static qd_error_t load_server_config(qd_dispatch_t *qd, qd_server_config_t *conf
     bool verifyHostName     = qd_entity_opt_bool(entity, "verifyHostName",    true);     CHECK();
     bool requireEncryption  = qd_entity_opt_bool(entity, "requireEncryption", false);    CHECK();
     bool requireSsl         = qd_entity_opt_bool(entity, "requireSsl",        false);    CHECK();
-    bool depRequirePeerAuth = qd_entity_opt_bool(entity, "requirePeerAuth",   false);    CHECK();
-    bool depAllowUnsecured  = qd_entity_opt_bool(entity, "allowUnsecured", !requireSsl); CHECK();
 
     memset(config, 0, sizeof(*config));
     config->log_message          = qd_entity_opt_string(entity, "logMessage", 0);     CHECK();
@@ -392,11 +368,11 @@ static qd_error_t load_server_config(qd_dispatch_t *qd, qd_server_config_t *conf
     stripAnnotations = 0;
     CHECK();
 
-    config->requireAuthentication = authenticatePeer || depRequirePeerAuth;
-    config->requireEncryption     = requireEncryption || !depAllowUnsecured;
+    config->requireAuthentication = authenticatePeer;
+    config->requireEncryption     = requireEncryption || requireSsl;
 
     if (config->ssl_profile) {
-        config->ssl_required = requireSsl || !depAllowUnsecured;
+        config->ssl_required = requireSsl;
         config->ssl_require_peer_authentication = config->sasl_mechanisms &&
             strstr(config->sasl_mechanisms, "EXTERNAL") != 0;
 
@@ -412,6 +388,7 @@ static qd_error_t load_server_config(qd_dispatch_t *qd, qd_server_config_t *conf
             config->ssl_display_name_file = SSTRDUP(ssl_profile->ssl_display_name_file);
         }
     }
+
     if (config->sasl_plugin) {
         qd_config_sasl_plugin_t *sasl_plugin =
             qd_find_sasl_plugin(qd->connection_manager, config->sasl_plugin);
@@ -631,9 +608,77 @@ qd_error_t qd_entity_refresh_listener(qd_entity_t* entity, void *impl)
 }
 
 
+static int get_failover_info_length(qd_failover_item_list_t   conn_info_list)
+{
+    int arr_length = 0;
+    qd_failover_item_t *item = DEQ_HEAD(conn_info_list);
+
+    item = DEQ_NEXT(item);
+    while(item) {
+        if (item->scheme) {
+            // The +3 is for the '://'
+            arr_length += strlen(item->scheme) + 3;
+        }
+        if (item->host_port) {
+            arr_length += strlen(item->host_port);
+        }
+        item = DEQ_NEXT(item);
+        if (item) {
+            // This is for the comma between the items
+            arr_length += 2;
+        }
+    }
+
+    if (arr_length > 0)
+        // This is for the final '\0'
+        arr_length += 1;
+
+    return arr_length;
+}
+
 qd_error_t qd_entity_refresh_connector(qd_entity_t* entity, void *impl)
 {
-    return QD_ERROR_NONE;
+    qd_connector_t *ct = (qd_connector_t*) impl;
+
+    if (DEQ_SIZE(ct->conn_info_list) > 1) {
+        qd_failover_item_list_t   conn_info_list = ct->conn_info_list;
+
+        qd_failover_item_t *item = DEQ_HEAD(conn_info_list);
+
+        //
+        // As you can see we are skipping the head of the list. The
+        // first item in the list is always the original connection information
+        // and we dont want to display that information as part of the failover list.
+        //
+        int arr_length = get_failover_info_length(conn_info_list);
+        char failover_info[arr_length];
+        memset(failover_info, 0, sizeof(failover_info));
+
+        item = DEQ_NEXT(item);
+
+        while(item) {
+            if (item->scheme) {
+                strcat(failover_info, item->scheme);
+                strcat(failover_info, "://");
+            }
+            if (item->host_port) {
+                strcat(failover_info, item->host_port);
+            }
+            item = DEQ_NEXT(item);
+            if (item) {
+                strcat(failover_info, ", ");
+            }
+        }
+
+        if (qd_entity_set_string(entity, "failoverList", failover_info) == 0)
+            return QD_ERROR_NONE;
+    }
+    else {
+        if (qd_entity_clear(entity, "failoverList") == 0)
+            return QD_ERROR_NONE;
+    }
+
+    return qd_error_code();
 }
 
 
@@ -645,6 +690,24 @@ qd_connector_t *qd_dispatch_configure_connector(qd_dispatch_t *qd, qd_entity_t *
         DEQ_ITEM_INIT(ct);
         DEQ_INSERT_TAIL(cm->connectors, ct);
         log_config(cm->log_source, &ct->config, "Connector");
+
+        //
+        // Add the first item to the ct->conn_info_list
+        // The initial connection information and any backup connection information is stored in the conn_info_list
+        //
+        qd_failover_item_t *item = NEW(qd_failover_item_t);
+        ZERO(item);
+        item->scheme   = 0;
+        item->host     = strdup(ct->config.host);
+        item->port     = strdup(ct->config.port);
+        item->hostname = 0;
+
+        int hplen = strlen(item->host) + strlen(item->port) + 2;
+        item->host_port = malloc(hplen);
+        snprintf(item->host_port, hplen, "%s:%s", item->host , item->port);
+
+        DEQ_INSERT_TAIL(ct->conn_info_list, item);
+
         return ct;
     }
     qd_log(cm->log_source, QD_LOG_ERROR, "Unable to create connector: %s", qd_error_message());

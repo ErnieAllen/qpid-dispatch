@@ -81,6 +81,7 @@ foreach(py_test_module
     system_tests_drain
     system_tests_management
     system_tests_one_router
+    system_tests_handle_failover
     system_tests_default_distribution
     system_tests_policy
     system_tests_protocol_family
@@ -90,7 +91,6 @@ foreach(py_test_module
     system_tests_sasl_plain
     system_tests_user_id
     system_tests_user_id_proxy
-    system_tests_deprecated
     system_tests_two_routers
     system_tests_distribution
     system_tests_multi_tenancy
