@@ -74,8 +74,19 @@ bower_components/bootstrap/css/*
 
 !bower_components/patternfly/
 bower_components/patternfly/*
-!bower_components/patternfly/dist
+!bower_components/patternfly/dist/
 bower_components/patternfly/dist/*
-!bower_components/patternfly/dist/css
+!bower_components/patternfly/dist/css/
 bower_components/patternfly/dist/css/*
 !bower_components/patternfly/dist/css/patternfly.min.css
+!bower_components/patternfly/dist/fonts/
+bower_components/patternfly/dist/fonts/*
+!bower_components/patternfly/dist/fonts/fontawesome-webfont.ttf
+!bower_components/patternfly/dist/fonts/fontawesome-webfont.woff*
+!bower_components/patternfly/dist/fonts/OpenSans-Regular-webfont.ttf
+!bower_components/patternfly/dist/fonts/OpenSans-Regular-webfont.woff*
+!bower_components/patternfly/dist/fonts/OpenSans-Bold-webfont.ttf
+!bower_components/patternfly/dist/fonts/OpenSans-Bold-webfont.woff*
+!bower_components/patternfly/dist/fonts/OpenSans-Semibold-webfont.ttf
+!bower_components/patternfly/dist/fonts/OpenSans-Semibold-webfont.woff*
+
