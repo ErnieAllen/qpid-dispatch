@@ -62,9 +62,9 @@ bower_components/jquery-ui/*
 !bower_components/jquery-ui/jquery-ui.min.js
 !bower_components/jquery-ui/themes/
 bower_components/jquery-ui/themes/*
-!bower_components/jquery-ui/themes/smoothmess
-bower_components/jquery-ui/themes/smoothmess/*
-!bower_components/jquery-ui/themes/smoothmess/jquery-ui.min.css
+!bower_components/jquery-ui/themes/smoothness/
+bower_components/jquery-ui/themes/smoothness/*
+!bower_components/jquery-ui/themes/smoothness/jquery-ui.min.css
 
 !bower_components/bootstrap/
 bower_components/bootstrap/*
