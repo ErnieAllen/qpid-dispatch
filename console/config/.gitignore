@@ -45,11 +45,11 @@ bower_components/angular-bootstrap/*
 bower_components/d3/*
 !bower_components/d3/d3.min.js
 
-!bower_components/notify/
-bower_components/notify/*
-!bower_components/d3/dist/
-bower_components/d3/dist/*
-!bower_components/d3/dist/notify.min.js
+!bower_components/notifyjs/
+bower_components/notifyjs/*
+!bower_components/notifyjs/dist/
+bower_components/notifyjs/dist/*
+!bower_components/notifyjs/dist/notify.js
 
 !bower_components/font-awesome/
 bower_components/font-awesome/*
