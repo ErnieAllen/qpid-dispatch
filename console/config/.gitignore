@@ -79,6 +79,7 @@ bower_components/patternfly/dist/*
 !bower_components/patternfly/dist/css/
 bower_components/patternfly/dist/css/*
 !bower_components/patternfly/dist/css/patternfly.min.css
+!bower_components/patternfly/dist/css/patternfly-additions.min.css
 !bower_components/patternfly/dist/fonts/
 bower_components/patternfly/dist/fonts/*
 !bower_components/patternfly/dist/fonts/fontawesome-webfont.ttf
