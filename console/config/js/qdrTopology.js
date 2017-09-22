@@ -29,7 +29,7 @@ var QDR = (function(QDR) {
   QDR.module.controller("QDR.TopologyController", ['$scope', '$rootScope', 'QDRService', '$location', '$timeout', '$uibModal',
     function($scope, $rootScope, QDRService, $location, $timeout, $uibModal) {
 
-      var settings = {baseName: "A", http_port: 5673, normal_port: 22000, internal_port: 2000, default_host: "0.0.0.0"}
+      var settings = {baseName: "A", http_port: 5673, normal_port: 22000, internal_port: 2000, default_host: "0.0.0.0", artemis_port: 61616, qpid_port: 5672}
       var sections = ['log', 'connector', 'sslProfile', 'listener']
 
       $scope.Publish = function () {
@@ -110,9 +110,9 @@ var QDR = (function(QDR) {
                   var type = section
                   if (section === 'listener' && key == settings.http_port)
                     type = 'console'
-                  if (section === 'connector' && key == 616161 && node['connectors']['616161']['role'] === 'route-container')
+                  if (section === 'connector' && key == settings.artemis_port && node['connectors'][settings.artemis_port+'']['role'] === 'route-container')
                     type = 'artemis'
-                  if (section === 'connector' && key == 5672 && node['connectors']['5672']['role'] === 'route-container')
+                  if (section === 'connector' && key == settings.qpid_port && node['connectors'][settings.qpid_port+'']['role'] === 'route-container')
                     type = 'qpid'
                   var sub = genNodeToAdd(node, type, key)
                   nodes.push(sub)
@@ -134,6 +134,8 @@ var QDR = (function(QDR) {
       $scope.Clear = function () {
         nodes = []
         links = []
+        $scope.selected_node = null
+        resetMouseVars()
         force.nodes(nodes).links(links).start();
         restart();
       }
@@ -196,8 +198,6 @@ var QDR = (function(QDR) {
         $('#action_menu').css(position)
       }
 
-      var port = 20000
-      var connectionId = 1
       var genNodeToAdd = function (contextNode, type, entityKey) {
         var id = contextNode.key
         var clients = nodes.filter ( function (node) {
@@ -244,15 +244,9 @@ var QDR = (function(QDR) {
 
         var uid = "connection/" + node.host + ":" + node.connectionId
         getLink(contextNode.id, nodes.length-1, node.cdir, "small", uid);
-        ++port
         force.nodes(nodes).links(links).start();
-        //initLegend()
         restart();
       }
-
-      var urlPrefix = $location.absUrl();
-      urlPrefix = urlPrefix.split("#")[0]
-      QDR.log.debug("started QDR.TopologyController with urlPrefix: " + urlPrefix);
 
       $scope.addingNode = {
         step: 0,
@@ -265,7 +259,6 @@ var QDR = (function(QDR) {
       }
 
       $scope.selected_node = null
-      var NewRouterName = "__NEW__";
       // mouse event vars
       var selected_link = null,
         mousedown_link = null,
@@ -274,34 +267,6 @@ var QDR = (function(QDR) {
         mouseup_node = null,
         initial_mouse_down_position = null;
 
-      $scope.modes = [{
-          title: 'Topology view',
-          name: 'Diagram',
-          right: false
-        },
-        /* {title: 'Add a new router node', name: 'Add Router', right: true} */
-      ];
-      $scope.mode = "Diagram";
-      $scope.isModeActive = function(name) {
-        if ((name == 'Add Router' || name == 'Diagram') && $scope.addingNode.step > 0)
-          return true;
-        return ($scope.mode == name);
-      }
-      $scope.selectMode = function(name) {
-        if (name == "Add Router") {
-          name = 'Diagram';
-          if ($scope.addingNode.step > 0) {
-            $scope.addingNode.step = 0;
-          } else {
-            // start adding node mode
-            $scope.addingNode.step = 1;
-          }
-        } else {
-          $scope.addingNode.step = 0;
-        }
-
-        $scope.mode = name;
-      }
       $scope.hasConsoleListener = function (node) {
         if (!node) {
           for (var i=0; i<nodes.length; i++) {
@@ -331,7 +296,8 @@ var QDR = (function(QDR) {
       $scope.addConsoleListener = function (node) {
         if (!node.listeners)
           node.listeners = {}
-        node.listeners[settings.http_port] = {name: 'Console Listener', http: true, port: settings.http_port, host: '0.0.0.0', saslMechanisms: 'ANONYMOUS'}
+        var host = node.host || settings.default_host
+        node.listeners[settings.http_port] = {name: 'Console Listener', http: true, port: settings.http_port, host: host, saslMechanisms: 'ANONYMOUS'}
         addToNode(node, "console", settings.http_port)
       }
       $scope.delConsoleListener = function (node) {
@@ -341,7 +307,7 @@ var QDR = (function(QDR) {
           $scope.delNode(n)
       }
 
-      var yoffset = 1
+      var yoffset = 1; // toggles between 1 and -1. used to position new nodes
       $scope.addAnotherNode = function (calc) {
         resetMouseVars();
         // add a new node
@@ -382,16 +348,11 @@ var QDR = (function(QDR) {
         var nextId = nodes.length //maxNodeIndex() + 1
         var id = "amqp:/_topo/0/" + name + "/$management";
         var node = aNode(id, name, "inter-router", undefined, nextId, x, y, undefined, false)
-        node.host = "0.0.0.0:" + port
-        ++port
+        node.host = settings.default_host
         nodes.push(node);
         $scope.selected_node = node
         force.nodes(nodes).links(links).start();
         restart(false);
-      }
-
-      $scope.isRight = function(mode) {
-        return mode.right;
       }
 
       var maxNodeIndex = function () {
@@ -590,7 +551,7 @@ var QDR = (function(QDR) {
           id: nodeIndex,
           host: '0.0.0.0',
           resultIndex: resultIndex,
-          cls: name == NewRouterName ? 'temp' : ''
+          cls: ''
         };
       };
 
@@ -701,15 +662,6 @@ var QDR = (function(QDR) {
           .attr("orient", "auto")
           .append("svg:path")
             .attr('d', 'M 10 -5 L 0 0 L 10 5 z');
-
-        var grad = svg.append("svg:defs").append("linearGradient")
-          .attr("id", "half-circle")
-          .attr("x1", "0%")
-          .attr("x2", "0%")
-          .attr("y1", "100%")
-          .attr("y2", "0%");
-        grad.append("stop").attr("offset", "50%").style("stop-color", "#C0F0C0");
-        grad.append("stop").attr("offset", "50%").style("stop-color", "#F0F000");
 
         // handles to link and node element groups
         path = svg.append('svg:g').selectAll('path')
@@ -943,13 +895,13 @@ var QDR = (function(QDR) {
             var sel = d === selected_link ? '-selected' : (d.cls === 'small' ? '-small' : '');
             if (d.highlighted)
               sel = "-highlighted"
-            return d.left ? 'url(' + urlPrefix + '#start-arrow' + sel + ')' : '';
+            return d.left ? 'url(#start-arrow' + sel + ')' : '';
           })
           .attr('marker-end', function(d) {
             var sel = d === selected_link ? '-selected' : (d.cls === 'small' ? '-small' : '');
             if (d.highlighted)
               sel = "-highlighted"
-            return d.right ? 'url(' + urlPrefix + '#end-arrow' + sel + ')' : '';
+            return d.right ? 'url(#end-arrow' + sel + ')' : '';
           })
 
 
@@ -958,11 +910,11 @@ var QDR = (function(QDR) {
           .attr('class', 'link')
           .attr('marker-start', function(d) {
             var sel = d === selected_link ? '-selected' : (d.cls === 'small' ? '-small' : '');
-            return d.left ? 'url(' + urlPrefix + '#start-arrow' + sel + ')' : '';
+            return d.left ? 'url(#start-arrow' + sel + ')' : '';
           })
           .attr('marker-end', function(d) {
             var sel = d === selected_link ? '-selected' : (d.cls === 'small' ? '-small' : '');
-            return d.right ? 'url(' + urlPrefix + '#end-arrow' + sel + ')' : '';
+            return d.right ? 'url(#end-arrow' + sel + ')' : '';
           })
           .classed('temp', function(d) {
             return d.cls == 'temp';
@@ -1028,9 +980,9 @@ var QDR = (function(QDR) {
               return 'Broker - Artemis'
             }
             if (d.cdir === 'in')
-              return 'Listener'
+              return 'Listener on port ' + d.entityKey
             if (d.cdir === 'out')
-              return 'Connector'
+              return 'Connector to ' + d.host + ':' + d.entityKey
             if (d.cdir === 'both')
               return 'sslProfile'
             return d.nodeType == 'normal' ? 'client' : (d.nodeType == 'route-container' ? 'broker' : 'Router ' + d.name)
@@ -1068,12 +1020,6 @@ var QDR = (function(QDR) {
             .attr('class', 'node')
             .attr('r', function(d) {
               return radii[d.nodeType]
-            })
-            .attr('fill', function (d) {
-              if (d.cdir === 'both' && !QDRService.isConsole(d)) {
-                return 'url(' + urlPrefix + '#half-circle)'
-              }
-              return null;
             })
             .classed('normal', function(d) {
               return d.nodeType == 'normal' || QDRService.isConsole(d)
@@ -1269,11 +1215,12 @@ var QDR = (function(QDR) {
                   return '\uf2a0'; // phone top
                 else if (d.nodeType === 'normal' && d.cdir === "out") // connector
                   return '\uf2a0'; // phone top (will be rotated)
-                else if (d.nodeType === 'normal' && d.cdir === "both")
+                else if (d.nodeType === 'normal' && d.cdir === "both") // not used
                   return '\uf023'; // icon-laptop for clients
 
               return d.name.length > 7 ? d.name.substr(0, 6) + '...' : d.name;
             })
+            // rotatie the listener icon 180 degrees to use as the connector icon
            .attr("transform", function (d) {
               var nAngle = 0
               if (d.nodeType === 'normal' && d.cdir === "out")
@@ -1411,7 +1358,6 @@ var QDR = (function(QDR) {
       $scope.mockTopologyDir = ""
       QDRService.sendMethod("GET-TOPOLOGY-LIST", {}, function (response) {
         $scope.mockTopologies = response.sort()
-        QDR.log.info("setting mockTopologies to " + response)
         QDRService.sendMethod("GET-TOPOLOGY", {}, function (response) {
           // this will trigger the watch on this variable which will get the topology
           $timeout(function () {
@@ -1554,7 +1500,7 @@ var QDR = (function(QDR) {
               var maxPort = settings.normal_port
               nodes.forEach(function (node) {
                 if (node.entity === 'listener' || node.entity === 'connector') {
-                  if (node.entityKey !== 'amqp' && node.entityKey != 616161 && node.entityKey != 5672)
+                  if (node.entityKey !== 'amqp' && node.entityKey != settings.artemis_port && node.entityKey != settings.qpid_port)
                     if (parseInt(node.entityKey) > maxPort)
                       maxPort = parseInt(node.entityKey)
                 }
@@ -1598,6 +1544,8 @@ var QDR = (function(QDR) {
                       delete nodeObj[context]
                     }
                     nodeObj[o.node[key]] = o.node
+                    if (entity === 'log' || entity === 'sslProfile')
+                      return
                     if (context === 'new' || context === 'artemis' || context === 'qpid') {
                       if (context !== 'new')
                         entity = context
@@ -1676,10 +1624,10 @@ var QDR = (function(QDR) {
     $scope.entity = {description: "Settings",
                     attributes: [
                       {name: "baseName", humanName: "Starting router name", input: "input", type: "text", value: local_settings.baseName, required: true},
-                      {name: "http", humanName: "Port for console listeners", input: "input", type: "text", value: local_settings.http_port},
-                      {name: "normal_port", humanName: "Starting port for normal listeners/connectors", input: "input", type: "text", value: local_settings.normal_port},
-                      {name: "internal_port", humanName: "Starting port for inter-router listeners/connectors", input: "input", type: "text", value: local_settings.internal_port},
-                      {name: "default_host", humanName: "Default host for inter-router listeners/connectors", input: "input", type: "text", value: local_settings.default_host},
+                      {name: "http", humanName: "Port for console listeners", input: "input", type: "text", value: local_settings.http_port, required: true},
+                      {name: "normal_port", humanName: "Starting port for normal listeners/connectors", input: "input", type: "text", value: local_settings.normal_port, required: true},
+                      {name: "internal_port", humanName: "Starting port for inter-router listeners/connectors", input: "input", type: "text", value: local_settings.internal_port, required: true},
+                      {name: "default_host", humanName: "Default host for inter-router listeners/connectors", input: "input", type: "text", value: local_settings.default_host, required: true},
                     ]}
 
     $scope.setSettings = function () {

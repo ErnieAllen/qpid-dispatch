@@ -12,5 +12,3 @@ tests/policy-1/policy-*.json
 .metadata
 .settings
 console/test/topolgies/config-*
-console/config/topologies/
-console/config/bower_components/

@@ -122,3 +122,7 @@ span.logo {
 div.boolean label {
   margin-bottom: 0;
 }
+
+.alert {
+  max-width: 20em;
+}

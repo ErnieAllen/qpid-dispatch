@@ -70,7 +70,7 @@ var QDR = (function(QDR) {
 
   Core = {
     notification: function (severity, msg) {
-        $.notify(msg, severity);
+      $.notify(msg, severity)
     }
   }
 
@@ -126,7 +126,7 @@ var QDR = (function(QDR) {
   QDR.logger = function ($log) {
     var log = $log;
 
-    this.debug = function (msg) { msg = "QDR: " + msg; log.info(msg)};
+    this.debug = function (msg) { msg = "QDR: " + msg; log.debug(msg)};
     this.error = function (msg) {msg = "QDR: " + msg; log.error(msg)}
     this.info = function (msg) {msg = "QDR: " + msg; log.info(msg)}
     this.warn = function (msg) {msg = "QDR: " + msg; log.warn(msg)}
@@ -139,29 +139,13 @@ var QDR = (function(QDR) {
     QDR.log = new QDR.logger($log);
     QDR.log.info("*************creating config editor************");
     QDRService.getSchema(function () {
-      QDR.log.info("got schema")
+      QDR.log.debug("got schema")
     })
   }]);
 
   QDR.module.config(['$qProvider', function ($qProvider) {
       $qProvider.errorOnUnhandledRejections(false);
   }]);
-
-  QDR.module.controller ("QDR.Core", function ($scope, $rootScope) {
-    $scope.alerts = [];
-    $scope.closeAlert = function(index) {
-            $scope.alerts.splice(index, 1);
-        };
-    $scope.$on('newAlert', function(event, data) {
-      $scope.alerts.push(data);
-      $scope.$apply();
-    });
-    $scope.$on("clearAlerts", function () {
-      $scope.alerts = [];
-      $scope.$apply();
-    })
-
-  })
 
   return QDR;
 }(QDR || {}));

@@ -26,7 +26,7 @@ var QDR = (function(QDR) {
     $scope.context = context
     if (!angular.isDefined(context))
       $scope.context = 'new'
-    var newContext = {"new":maxPort+1, "artemis":616161, "qpid":5672}
+    var newContext = {"new":maxPort+1, "artemis":61616, "qpid":5672, 'log':'', 'sslProfile':''}
     $scope.title = ((context && context in newContext) ? "Edit " : "Add ") + entityType + " section"
     if (context === 'artemis')
       $scope.title += " to an Artemis broker"
@@ -290,7 +290,7 @@ var QDR = (function(QDR) {
       $uibModalInstance.close({del: true})
     }
     $scope.showDelete = function () {
-      return context in newContext
+      return !(context === 'new' || !context)
     }
 
   });
