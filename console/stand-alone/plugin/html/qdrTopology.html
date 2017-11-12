@@ -36,7 +36,15 @@ under the License.
         <button ng-if="!panelVisible" ng-click="showLeftPane()" class="hideLeft" title="Show"><i class="icon-step-forward"></i></button>
     </div>
     <div class="panel-adjacent">
-        <div id="topology"><!-- d3 toplogy here --></div>
+        <ul class="nav nav-tabs ng-scope qdrTopoModes">
+            <li ng-repeat="mode in modes" ng-class="{active : isModeActive(mode.name), 'pull-right' : isRight(mode)}" ng-click="selectMode(mode.name)" >
+                <a data-placement="bottom" class="ng-binding"> {{mode.name}} </a></li>
+        </ul>
+        <div id="topology" ng-show="mode == 'Diagram'"><!-- d3 toplogy here --></div>
+        <div class="geology_container">
+            <div id="geology" ng-show="mode == 'Globe'"><!-- d3 globe here --></div>
+        </div>
+
         <div id="crosssection"></div><div id="crosshtml" ng-bind-html="crosshtml"></div>
 
         <div id="node_context_menu" class="contextMenu">

@@ -729,3 +729,11 @@ select.required, input.required {
   color: red;
   font-weight: bold;
 }
+
+#geology svg {
+  background-color: transparent;
+}
+
+.geology_container {
+  overflow: hidden;
+}

@@ -188,8 +188,8 @@ var QDR = (function(QDR) {
       QDRService.management.topology.delUpdatedAction("initChartService")
       QDRChartService.init(); // initialize charting service after we are connected
     });
-    var settings = angular.fromJson(localStorage[QDR.SETTINGS_KEY]) || {autostart: false, address: 'localhost', port: 5673}
     if (!QDRService.management.connection.is_connected()) {
+
       // attempt to connect to the host:port that served this page
       var protocol = $location.protocol()
       var host = $location.host()
@@ -200,6 +200,10 @@ var QDR = (function(QDR) {
           $location.search("org", "overview")
       }
       var connectOptions = {address: host, port: port}
+      var settings = angular.fromJson(localStorage[QDR.SETTINGS_KEY]) || {autostart: false, address: 'localhost', port: 5673}
+      if (settings.autostart) {
+        connectOptions = {address: settings.address, port: settings.port}
+      }
       QDRService.management.connection.testConnect(connectOptions, function (e) {
         if (e.error) {
           QDR.log.debug("failed to auto-connect to " + host + ":" + port)
@@ -210,7 +214,10 @@ var QDR = (function(QDR) {
             $location.search('org', org)
           })
         } else {
-          QDR.log.info("Connect succeeded. Using address:port of browser")
+          if (settings.autostart)
+            QDR.log.info("Connect succeeded. Using saved address:port")
+          else
+            QDR.log.info("Connect succeeded. Using address:port of browser")
           // register an onConnect event handler
           QDRService.management.connection.addConnectAction( function () {
             QDRService.management.getSchema(function () {

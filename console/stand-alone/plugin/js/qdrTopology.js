@@ -73,6 +73,293 @@ console.log("showEntityForm " + args.entity)
   QDR.module.controller("QDR.TopologyController", ['$scope', '$rootScope', 'QDRService', '$location', '$timeout', '$uibModal', '$sce',
     function($scope, $rootScope, QDRService, $location, $timeout, $uibModal, $sce) {
 
+
+      $scope.modes = [
+        {title: 'Topology view', name: 'Diagram', right: false},
+        {title: '3D Globe view', name: 'Globe', right: false}
+        ];
+        $scope.mode = "Diagram";
+    $scope.isModeActive = function (name) {
+      if ((name == 'Add Router' || name == 'Diagram') && $scope.addingNode.step > 0)
+        return true;
+      return ($scope.mode == name);
+    }
+    $scope.selectMode = function (name) {
+      $scope.mode = name;
+    }
+
+    $scope.addingNode = {
+      step: 0,
+      hasLink: false,
+      trigger: ''
+    };
+    var possibleCities = ["Boston","Tel Aviv-Yafo", "Brno", "Toronto", "Beijing", "Ashburn", "Raleigh"]
+    var cities = ["Raleigh", "Brno", "Beijing"];
+    var initGlobe = function (clients) {
+      d3.select(window)
+        .on("mousemove", mousemove)
+        .on("mouseup", mouseup);
+
+      var wwidth = 960,
+        wheight = 700;
+
+        var sizes = getSizes()
+        wwidth = sizes[0]
+        wheight = sizes[1]
+
+      var ypos = (wheight / 2)
+      var proj = d3.geo.orthographic()
+        .scale(220)
+        .translate([wwidth / 2, ypos])
+        .clipAngle(90);
+
+      var wpath = d3.geo.path().projection(proj).pointRadius(1.5);
+
+      var wlinks = [],
+        arcLines = [];
+
+      var graticule = d3.geo.graticule();
+      d3.select("#geology svg").remove();
+      var wsvg = d3.select("#geology").append("svg")
+        .attr("width", wwidth)
+        .attr("height", wheight)
+        .on("mousedown", mousedown);
+
+      d3.queue()
+        .defer(d3.json, "plugin/data/world-110m.json")
+        .defer(d3.json, "plugin/data/places1.json")
+        .await(ready);
+
+      var noRotate = false
+
+      function ready(error, world, places) {
+        var ocean_fill = wsvg.append("defs").append("radialGradient")
+          .attr("id", "ocean_fill")
+          .attr("cx", "75%")
+          .attr("cy", "25%");
+          ocean_fill.append("stop").attr("offset", "5%").attr("stop-color", "#fff");
+          ocean_fill.append("stop").attr("offset", "100%").attr("stop-color", "#eef");
+
+        var globe_highlight = wsvg.append("defs").append("radialGradient")
+          .attr("id", "globe_highlight")
+          .attr("cx", "75%")
+          .attr("cy", "25%");
+          globe_highlight.append("stop")
+          .attr("offset", "5%").attr("stop-color", "#ffd")
+          .attr("stop-opacity","0.6");
+          globe_highlight.append("stop")
+          .attr("offset", "100%").attr("stop-color", "#ba9")
+          .attr("stop-opacity","0.1");
+
+        var globe_shading = wsvg.append("defs").append("radialGradient")
+          .attr("id", "globe_shading")
+          .attr("cx", "55%")
+          .attr("cy", "45%");
+          globe_shading.append("stop")
+          .attr("offset","30%").attr("stop-color", "#fff")
+          .attr("stop-opacity","0")
+          globe_shading.append("stop")
+          .attr("offset","100%").attr("stop-color", "#505962")
+          .attr("stop-opacity","0.2")
+
+        var drop_shadow = wsvg.append("defs").append("radialGradient")
+          .attr("id", "drop_shadow")
+          .attr("cx", "50%")
+          .attr("cy", "50%");
+          drop_shadow.append("stop")
+          .attr("offset","20%")
+          .attr("stop-color", "#000")
+          .attr("stop-opacity",".5")
+          drop_shadow.append("stop")
+          .attr("offset","100%").attr("stop-color", "#000")
+          .attr("stop-opacity","0")
+
+        var svgg = wsvg.call(d3.behavior.zoom().scaleExtent([0.8, 8]).on("zoom", function () {
+          //if (d3.event.sourceEvent.shiftKey) {
+          //  noRotate = true;
+          //  wsvg.attr("transform", "translate(" + d3.event.translate + ")" + " scale(" + d3.event.scale + ")")
+          //} else {
+            wsvg.attr("transform", " scale(" + d3.event.scale + ")")
+          //}
+        }))
+        .append("g")
+          .attr("id", "wholewideworld")
+          .attr("transform", "scale(1,1)")
+
+        svgg.append("ellipse")
+        .attr("cx", wwidth/2)
+        .attr("cy", wheight * .75)
+        .attr("rx", proj.scale()*.90)
+        .attr("ry", proj.scale()*.65)
+        .attr("class", "noclicks")
+        .style("fill", "url(#drop_shadow)");
+
+        svgg.append("circle")
+        .attr("cx", wwidth / 2).attr("cy", ypos)
+        .attr("r", proj.scale())
+        .attr("class", "noclicks")
+        .style("fill", "url(#ocean_fill)");
+
+        svgg.append("path")
+        .datum(topojson.object(world, world.objects.land))
+        .attr("class", "land noclicks")
+        .attr("d", wpath);
+
+        svgg.append("path")
+        .datum(graticule)
+        .attr("class", "graticule noclicks")
+        .attr("d", wpath);
+
+        svgg.append("circle")
+        .attr("cx", wwidth / 2).attr("cy", ypos)
+        .attr("r", proj.scale())
+        .attr("class","noclicks")
+        .style("fill", "url(#globe_highlight)");
+
+        svgg.append("circle")
+        .attr("cx", wwidth / 2).attr("cy", ypos)
+        .attr("r", proj.scale())
+        .attr("class","noclicks")
+        .style("fill", "url(#globe_shading)");
+
+        var filtered = places.features.filter( function (feature) {
+          return clients.indexOf(feature.properties.NAME) > -1
+        })
+        svgg.append("g").attr("class","points")
+          .selectAll("text").data(filtered)
+          .enter().append("path")
+          .attr("class", "point")
+          .attr("d", wpath);
+
+        svgg.append("g").attr("class","labels")
+          .selectAll("text").data(filtered)
+          .enter().append("text")
+          .attr("class", "label")
+          .text(function(d) { return d.properties.NAME })
+
+        position_labels();
+
+        // spawn links between cities as source/target coord pairs
+        places.features.forEach(function(a, i) {
+          if (clients.indexOf(a.properties.NAME) > -1) {
+            places.features.forEach(function(b, j) {
+              if (clients.indexOf(b.properties.NAME) > -1) {
+                if (j > i) {  // avoid duplicates
+                  wlinks.push({
+                    source: a.geometry.coordinates,
+                    target: b.geometry.coordinates
+                  });
+                }
+              }
+            });
+          }
+        });
+
+        // build geoJSON features from links array
+        wlinks.forEach(function(e,i,a) {
+        var feature =   { "type": "Feature", "geometry": { "type": "LineString", "coordinates": [e.source,e.target] }}
+        arcLines.push(feature)
+        })
+
+        svgg.append("g").attr("class","arcs")
+        .selectAll("path").data(arcLines)
+        .enter().append("path")
+          .attr("class","arc")
+          .attr("d",wpath)
+        refresh();
+      }
+            function position_labels() {
+              var centerPos = proj.invert([wwidth/2,wheight/2]);
+
+              var arc = d3.geo.greatArc();
+
+              wsvg.selectAll(".label")
+              .attr("transform", function(d) {
+                var loc = proj(d.geometry.coordinates),
+                x = loc[0],
+                y = loc[1];
+                var offset = x < wwidth/2 ? -5 : 5;
+                return "translate(" + (x+offset) + "," + (y-2) + ")"
+              })
+              .style("display",function(d) {
+                var d = arc.distance({source: d.geometry.coordinates, target: centerPos});
+                return (d > 1.57) ? 'none' : 'inline';
+              })
+            }
+
+            function refresh() {
+              wsvg.selectAll(".land").attr("d", wpath);
+              wsvg.selectAll(".point").attr("d", wpath);
+              wsvg.selectAll(".graticule").attr("d", wpath);
+              wsvg.selectAll(".arc").attr("d", wpath);
+              position_labels();
+            }
+
+            // modified from http://bl.ocks.org/1392560
+            var m0, o0;
+            o0 = angular.fromJson(localStorage["QDR.rotate"]);
+            if (o0)
+              proj.rotate(o0);
+
+            function mousedown() {
+              m0 = [d3.event.pageX, d3.event.pageY];
+              o0 = proj.rotate();
+              d3.event.preventDefault();
+            }
+            function mousemove() {
+              if (m0) {
+/*
+                if (d3.event.ctrlKey) {
+                  console.log("Mouse+Ctrl pressed");
+                  var m1 = [d3.event.pageX, d3.event.pageY]
+                  var vdist = m0[1] - m1[1]
+                  //var scale = proj.scale()
+                  var world = d3.select('#wholewideworld')
+                  var scale = d3.transform(world.attr("scale"))
+                  var s = scale.scale[0]
+console.log("current scale is " + s)
+
+                  if (vdist < 0) {
+                    s = s *.9
+                  } else if (vdist > 0) {
+                    s = s * 1.1
+                  }
+                  var sscale = "scale(" + s + "," + s + ")"
+                  world.attr("transform", sscale)
+                  scale = d3.transform(world.attr("scale"))
+                  s = scale.scale[0]
+console.log("new scale is " + s)
+                  m0 = m1;
+                  //refresh();
+                  return
+                }
+*/
+  if (noRotate) {
+    noRotate = false
+    return
+  }
+                var m1 = [d3.event.pageX, d3.event.pageY]
+                var o1 = [o0[0] + (m1[0] - m0[0]) / 6, o0[1] + (m0[1] - m1[1]) / 6];
+                o1[1] = o1[1] > 66  ? 66  :
+                  o1[1] < -55 ? -55 :
+                  o1[1];
+                proj.rotate(o1);
+                refresh();
+              }
+            }
+            function mouseup() {
+              if (m0) {
+              //mousemove();
+              m0 = null;
+              localStorage["QDR.rotate"] = angular.toJson(proj.rotate());
+              }
+            }
+
+    }
+
+
+
+
       $scope.multiData = []
       $scope.quiesceState = {}
       var dontHide = false;
@@ -1154,13 +1441,13 @@ console.log("showEntityForm " + args.entity)
             var sel = d === selected_link ? '-selected' : (d.cls === 'small' ? '-small' : '');
             if (d.highlighted)
               sel = "-highlighted"
-            return d.left ? 'url(' + urlPrefix + '#start-arrow' + sel + ')' : '';
+            return d.left ? 'url(#start-arrow' + sel + ')' : '';
           })
           .attr('marker-end', function(d) {
             var sel = d === selected_link ? '-selected' : (d.cls === 'small' ? '-small' : '');
             if (d.highlighted)
               sel = "-highlighted"
-            return d.right ? 'url(' + urlPrefix + '#end-arrow' + sel + ')' : '';
+            return d.right ? 'url(#end-arrow' + sel + ')' : '';
           })
 
 
@@ -1169,11 +1456,11 @@ console.log("showEntityForm " + args.entity)
           .attr('class', 'link')
           .attr('marker-start', function(d) {
             var sel = d === selected_link ? '-selected' : (d.cls === 'small' ? '-small' : '');
-            return d.left ? 'url(' + urlPrefix + '#start-arrow' + sel + ')' : '';
+            return d.left ? 'url(#start-arrow' + sel + ')' : '';
           })
           .attr('marker-end', function(d) {
             var sel = d === selected_link ? '-selected' : (d.cls === 'small' ? '-small' : '');
-            return d.right ? 'url(' + urlPrefix + '#end-arrow' + sel + ')' : '';
+            return d.right ? 'url(#end-arrow' + sel + ')' : '';
           })
           .classed('small', function(d) {
             return d.cls == 'small';
@@ -1367,7 +1654,7 @@ console.log("showEntityForm " + args.entity)
             })
             .attr('fill', function (d) {
               if (d.cdir === 'both' && !QDRService.utilities.isConsole(d)) {
-                return 'url(' + urlPrefix + '#half-circle)'
+                return 'url(#half-circle)'
               }
               return null;
             })
@@ -1971,6 +2258,8 @@ console.log("showEntityForm " + args.entity)
         // we currently have all entities available on all routers
         saveChanged();
         initForceGraph();
+        initGlobe(cities);
+
         // after the graph is displayed fetch all .router.node info. This is done so highlighting between nodes
         // doesn't incur a delay
         QDRService.management.topology.addUpdateEntities({entity: "router.node", attrs: ["id","nextHop"]})
@@ -2023,7 +2312,8 @@ console.log("showEntityForm " + args.entity)
 
       animate = true;
       setupInitialUpdate();
-      QDRService.management.topology.startUpdating(false);
+
+    QDRService.management.topology.startUpdating(false);
 
     }
   ]);
