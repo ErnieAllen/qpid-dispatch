@@ -78,7 +78,7 @@ console.log("showEntityForm " + args.entity)
         {title: 'Topology view', name: 'Diagram', right: false},
         {title: '3D Globe view', name: 'Globe', right: false}
         ];
-        $scope.mode = "Diagram";
+        $scope.mode = angular.fromJson(localStorage['QDR.topoMode']) || "Diagram";
     $scope.isModeActive = function (name) {
       if ((name == 'Add Router' || name == 'Diagram') && $scope.addingNode.step > 0)
         return true;
@@ -86,6 +86,8 @@ console.log("showEntityForm " + args.entity)
     }
     $scope.selectMode = function (name) {
       $scope.mode = name;
+      localStorage["QDR.topoMode"] = angular.toJson(name);
+
     }
 
     $scope.addingNode = {
@@ -95,6 +97,7 @@ console.log("showEntityForm " + args.entity)
     };
     var possibleCities = ["Boston","Tel Aviv-Yafo", "Brno", "Toronto", "Beijing", "Ashburn", "Raleigh"]
     var cities = ["Raleigh", "Brno", "Beijing"];
+    // modified from http://bl.ocks.org/dwtkns/4973620
     var initGlobe = function (clients) {
       d3.select(window)
         .on("mousemove", mousemove)
@@ -103,20 +106,36 @@ console.log("showEntityForm " + args.entity)
       var wwidth = 960,
         wheight = 700;
 
-        var sizes = getSizes()
-        wwidth = sizes[0]
-        wheight = sizes[1]
+        var gcontainer = $('.geology_container')
+        var fcontainer = $('.container-fluid')
 
+        var windowHeight = $(window).height();
+        var fposition = fcontainer.position()
+        gcontainer.height(windowHeight - fposition.top)
+        //var sizes = getSizes('geology')
+        wwidth = gcontainer.width()
+        wheight = gcontainer.height()
+console.log("geo width " + wwidth + " height " + wheight)
       var ypos = (wheight / 2)
       var proj = d3.geo.orthographic()
-        .scale(220)
         .translate([wwidth / 2, ypos])
-        .clipAngle(90);
+        .clipAngle(90)
+        .scale(220)
 
-      var wpath = d3.geo.path().projection(proj).pointRadius(1.5);
+      var sky = d3.geo.orthographic()
+        .translate([wwidth / 2, ypos])
+        .clipAngle(90)
+        .scale(240);
 
+      var wpath = d3.geo.path().projection(proj).pointRadius(6);
       var wlinks = [],
         arcLines = [];
+
+      var swoosh = d3.svg.line()
+        .x(function(d) { return d[0] })
+        .y(function(d) { return d[1] })
+        .interpolate("cardinal")
+        .tension(.0);
 
       var graticule = d3.geo.graticule();
       d3.select("#geology svg").remove();
@@ -130,8 +149,7 @@ console.log("showEntityForm " + args.entity)
         .defer(d3.json, "plugin/data/places1.json")
         .await(ready);
 
-      var noRotate = false
-
+      var zoom = d3.behavior.zoom()
       function ready(error, world, places) {
         var ocean_fill = wsvg.append("defs").append("radialGradient")
           .attr("id", "ocean_fill")
@@ -174,23 +192,20 @@ console.log("showEntityForm " + args.entity)
           .attr("offset","100%").attr("stop-color", "#000")
           .attr("stop-opacity","0")
 
-        var svgg = wsvg.call(d3.behavior.zoom().scaleExtent([0.8, 8]).on("zoom", function () {
-          //if (d3.event.sourceEvent.shiftKey) {
-          //  noRotate = true;
-          //  wsvg.attr("transform", "translate(" + d3.event.translate + ")" + " scale(" + d3.event.scale + ")")
-          //} else {
+        var lastScale = angular.fromJson(localStorage["QDR.scale"]) || 1.5
+        var svgg = wsvg.call(zoom.scaleExtent([0.8, 8]).on("zoom", function () {
             wsvg.attr("transform", " scale(" + d3.event.scale + ")")
-          //}
-        }))
-        .append("g")
-          .attr("id", "wholewideworld")
-          .attr("transform", "scale(1,1)")
+            position_labels()
+            localStorage["QDR.scale"] = angular.toJson(d3.event.scale);
+          }))
+          .attr("transform", "scale(" + lastScale + ")")
+        zoom.scale(lastScale)
 
         svgg.append("ellipse")
         .attr("cx", wwidth/2)
-        .attr("cy", wheight * .75)
-        .attr("rx", proj.scale()*.90)
-        .attr("ry", proj.scale()*.65)
+        .attr("cy", ypos+proj.scale())
+        .attr("rx", proj.scale()*.9)
+        .attr("ry", proj.scale()*.25)
         .attr("class", "noclicks")
         .style("fill", "url(#drop_shadow)");
 
@@ -201,7 +216,7 @@ console.log("showEntityForm " + args.entity)
         .style("fill", "url(#ocean_fill)");
 
         svgg.append("path")
-        .datum(topojson.object(world, world.objects.land))
+        .datum(topojson.feature(world, world.objects.land))
         .attr("class", "land noclicks")
         .attr("d", wpath);
 
@@ -254,7 +269,6 @@ console.log("showEntityForm " + args.entity)
             });
           }
         });
-
         // build geoJSON features from links array
         wlinks.forEach(function(e,i,a) {
         var feature =   { "type": "Feature", "geometry": { "type": "LineString", "coordinates": [e.source,e.target] }}
@@ -266,99 +280,114 @@ console.log("showEntityForm " + args.entity)
         .enter().append("path")
           .attr("class","arc")
           .attr("d",wpath)
+
+        svgg.append("g").attr("class","flyers")
+          .selectAll("path").data(wlinks)
+          .enter().append("path")
+          .attr("class","flyer")
+          .attr("d", function(d) { return swoosh(flying_arc(d)) })
+
         refresh();
       }
-            function position_labels() {
-              var centerPos = proj.invert([wwidth/2,wheight/2]);
 
-              var arc = d3.geo.greatArc();
+      function flying_arc(pts) {
+        var source = pts.source,
+            target = pts.target;
 
-              wsvg.selectAll(".label")
-              .attr("transform", function(d) {
-                var loc = proj(d.geometry.coordinates),
-                x = loc[0],
-                y = loc[1];
-                var offset = x < wwidth/2 ? -5 : 5;
-                return "translate(" + (x+offset) + "," + (y-2) + ")"
-              })
-              .style("display",function(d) {
-                var d = arc.distance({source: d.geometry.coordinates, target: centerPos});
-                return (d > 1.57) ? 'none' : 'inline';
-              })
-            }
+        var mid = location_along_arc(source, target, .5);
+        var result = [ proj(source),
+                       sky(mid),
+                       proj(target) ]
+        return result;
+      }
 
-            function refresh() {
-              wsvg.selectAll(".land").attr("d", wpath);
-              wsvg.selectAll(".point").attr("d", wpath);
-              wsvg.selectAll(".graticule").attr("d", wpath);
-              wsvg.selectAll(".arc").attr("d", wpath);
-              position_labels();
-            }
+      function position_labels() {
+        var centerPos = proj.invert([wwidth/2,wheight/2]);
+        var arc = d3.geo.greatArc();
 
-            // modified from http://bl.ocks.org/1392560
-            var m0, o0;
-            o0 = angular.fromJson(localStorage["QDR.rotate"]);
-            if (o0)
-              proj.rotate(o0);
+        wsvg.selectAll(".label")
+        .attr("transform", function(d) {
+          var loc = proj(d.geometry.coordinates),
+          x = loc[0],
+          y = loc[1];
+          var offset = x < wwidth/2 ? -5 : 5;
+          return "translate(" + (x+offset) + "," + (y-2) + ") scale(" + (1/zoom.scale()) + ")"
+        })
+        .style("display",function(d) {
+          var d = arc.distance({source: d.geometry.coordinates, target: centerPos});
+          return (d > 1.57) ? 'none' : 'inline';
+        })
+      }
 
-            function mousedown() {
-              m0 = [d3.event.pageX, d3.event.pageY];
-              o0 = proj.rotate();
-              d3.event.preventDefault();
-            }
-            function mousemove() {
-              if (m0) {
-/*
-                if (d3.event.ctrlKey) {
-                  console.log("Mouse+Ctrl pressed");
-                  var m1 = [d3.event.pageX, d3.event.pageY]
-                  var vdist = m0[1] - m1[1]
-                  //var scale = proj.scale()
-                  var world = d3.select('#wholewideworld')
-                  var scale = d3.transform(world.attr("scale"))
-                  var s = scale.scale[0]
-console.log("current scale is " + s)
+      function refresh() {
+        wsvg.selectAll(".land").attr("d", wpath);
+        wsvg.selectAll(".point").attr("d", wpath);
+        wsvg.selectAll(".graticule").attr("d", wpath);
+        wsvg.selectAll(".arc").attr("d", wpath);
+        wsvg.selectAll(".flyer").attr("d", function(d) { return swoosh(flying_arc(d)) })
+          .attr("opacity", function(d) {
+            return fade_at_edge(d)
+          })
 
-                  if (vdist < 0) {
-                    s = s *.9
-                  } else if (vdist > 0) {
-                    s = s * 1.1
-                  }
-                  var sscale = "scale(" + s + "," + s + ")"
-                  world.attr("transform", sscale)
-                  scale = d3.transform(world.attr("scale"))
-                  s = scale.scale[0]
-console.log("new scale is " + s)
-                  m0 = m1;
-                  //refresh();
-                  return
-                }
-*/
-  if (noRotate) {
-    noRotate = false
-    return
-  }
-                var m1 = [d3.event.pageX, d3.event.pageY]
-                var o1 = [o0[0] + (m1[0] - m0[0]) / 6, o0[1] + (m0[1] - m1[1]) / 6];
-                o1[1] = o1[1] > 66  ? 66  :
-                  o1[1] < -55 ? -55 :
-                  o1[1];
-                proj.rotate(o1);
-                refresh();
-              }
-            }
-            function mouseup() {
-              if (m0) {
-              //mousemove();
-              m0 = null;
-              localStorage["QDR.rotate"] = angular.toJson(proj.rotate());
-              }
-            }
+        position_labels();
+      }
+      function fade_at_edge(d) {
+        var centerPos = proj.invert([wwidth/2,wheight/2]),
+            arc = d3.geo.greatArc(),
+            start, end;
+        // function is called on 2 different data structures..
+        if (d.source) {
+          start = d.source,
+          end = d.target;
+        }
+        else {
+          start = d.geometry.coordinates[0];
+          end = d.geometry.coordinates[1];
+        }
 
+        var start_dist = 1.57 - arc.distance({source: start, target: centerPos}),
+            end_dist = 1.57 - arc.distance({source: end, target: centerPos});
+
+        var fade = d3.scale.linear().domain([-.1,0]).range([0,.1])
+        var dist = start_dist < end_dist ? start_dist : end_dist;
+        return fade(dist)
+      }
+
+      function location_along_arc(start, end, loc) {
+        var interpolator = d3.geo.interpolate(start,end);
+        return interpolator(loc)
+      }
+      // modified from http://bl.ocks.org/1392560
+      var m0, o0;
+      o0 = angular.fromJson(localStorage["QDR.rotate"]) || [0, -15]
+      if (o0) {
+        proj.rotate(o0);
+        sky.rotate(o0)
+      }
+
+      function mousedown() {
+        m0 = [d3.event.pageX, d3.event.pageY];
+        o0 = proj.rotate();
+        d3.event.preventDefault();
+      }
+      function mousemove() {
+        if (m0) {
+          var m1 = [d3.event.pageX, d3.event.pageY]
+          var o1 = [o0[0] + (m1[0] - m0[0]) / 6, o0[1] + (m0[1] - m1[1]) / 6];
+          o1[1] = Math.max(Math.min(o1[1], 90), -90)
+          proj.rotate(o1);
+          sky.rotate(o1);
+          refresh();
+        }
+      }
+      function mouseup() {
+        if (m0) {
+          mousemove();
+          m0 = null;
+          localStorage["QDR.rotate"] = angular.toJson(proj.rotate());
+        }
+      }
     }
-
-
-
 
       $scope.multiData = []
       $scope.quiesceState = {}
@@ -674,11 +703,12 @@ console.log("new scale is " + s)
       var width = 0;
       var height = 0;
 
-      var getSizes = function() {
+      var getSizes = function(div) {
+        div = div || "topology"
         var legendWidth = 143;
         var gap = 5;
-        var width = $('#topology').width() - gap - legendWidth;
-        var top = $('#topology').offset().top
+        var width = $('#'+div).width() - gap - legendWidth;
+        var top = $('#'+div).offset().top
         var tpformHeight = $('#topologyForm').height()
         var height = Math.max(window.innerHeight, tpformHeight + top) - top - gap;
         if (width < 10) {

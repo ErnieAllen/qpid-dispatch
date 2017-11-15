@@ -443,10 +443,12 @@ div.tabbable ul.nav-tabs {
   margin-bottom: 0;
 }
 
+/*
 ul.qdrTopoModes {
     position: relative;
     top: -10px;
 }
+*/
 .overview.section {
 	/* width: 35em; */
 }
