@@ -24,30 +24,13 @@ var QDR = (function(QDR) {
   // The QDR service handles the connection to
   // the server in the background
   QDR.module.factory("QDRService", ['$rootScope', '$http', '$timeout', '$resource', '$location', function($rootScope, $http, $timeout, $resource, $location) {
+
+
+    var dm = require("dispatch-management")
     var self = {
 
-      connectActions: [],
-      schema: undefined,
-
-      addConnectAction: function(action) {
-        if (angular.isFunction(action)) {
-          self.connectActions.push(action);
-        }
-      },
-      executeConnectActions: function() {
-        self.connectActions.forEach(function(action) {
-          try {
-            action.apply();
-          } catch (e) {
-            // in case the page that registered the handler has been unloaded
-            QDR.log.info(e.message)
-          }
-        });
-        self.connectActions = [];
-      },
-      nameFromId: function(id) {
-        return id.split('/')[3];
-      },
+      management: new dm.Management($location.protocol()),
+      utilities: dm.Utilities,
 
       humanify: function(s) {
         if (!s || s.length === 0)
@@ -62,36 +45,6 @@ var QDR = (function(QDR) {
         return v;
       },
 
-      // given an attribute name array, find the value at the same index in the values array
-      valFor: function(aAr, vAr, key) {
-        var idx = aAr.indexOf(key);
-        if ((idx > -1) && (idx < vAr.length)) {
-          return vAr[idx];
-        }
-        return null;
-      },
-
-      isArtemis: function(d) {
-        return d.nodeType === 'route-container' && d.properties.product === 'apache-activemq-artemis';
-      },
-
-      isQpid: function(d) {
-        return d.nodeType === 'route-container' && (d.properties && d.properties.product === 'qpid-cpp');
-      },
-
-      isAConsole: function(properties, connectionId, nodeType, key) {
-        return self.isConsole({
-          properties: properties,
-          connectionId: connectionId,
-          nodeType: nodeType,
-          key: key
-        })
-      },
-      isConsole: function(d) {
-        // use connection properties if available
-        return (d && d['properties'] && d['properties']['console_identifier'] === 'Dispatch console')
-      },
-
       flatten: function(attributes, result) {
         var flat = {}
         attributes.forEach(function(attr, i) {
@@ -99,36 +52,7 @@ var QDR = (function(QDR) {
             flat[attr] = result[i]
         })
         return flat;
-      },
-      getSchema: function(callback) {
-        self.sendMethod("GET-SCHEMA", {}, function (response) {
-          for (var entityName in response.entityTypes) {
-            var entity = response.entityTypes[entityName]
-            if (entity.deprecated) {
-              delete response.entityTypes[entityName]
-            } else {
-              for (var attributeName in entity.attributes) {
-                var attribute = entity.attributes[attributeName]
-                if (attribute.deprecated) {
-                  delete response.entityTypes[entityName].attributes[attributeName]
-                }
-              }
-            }
-          }
-          self.schema = response
-          callback()
-        })
-      },
-
-      sendMethod: function(operation, props, callback) {
-        setTimeout(function () {
-          props['operation'] = operation
-          $.post( "http://localhost:8000", JSON.stringify(props), function (response, status) {
-            callback(response)
-          }, "json" )
-        }, 1)
       }
-
     }
     return self;
   }]);

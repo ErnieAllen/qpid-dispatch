@@ -65,13 +65,40 @@ var QDR = (function(QDR) {
    *
    * This plugin's angularjs module instance
    */
-  QDR.module = angular.module(QDR.pluginName, ['ngAnimate', 'ngResource', 'ngSanitize', 'ui.bootstrap']);
+  QDR.module = angular.module(QDR.pluginName, ['ngAnimate', 'ngResource', 'ngSanitize', 'ngMessages', 'ui.bootstrap']);
 
   Core = {
     notification: function (severity, msg) {
       $.notify(msg, severity)
+      console.log(severity + ": " + msg)
     }
   }
+
+  // modified from http://benjii.me/2014/07/angular-directive-for-bootstrap-switch/
+  // allows ng-model tracking for jquery bootstrap-switch
+  QDR.module.directive('bootstrapSwitch', [
+   function() {
+     return {
+       restrict: 'A',
+       require: '?ngModel',
+       link: function(scope, element, attrs, ngModel) {
+         element.bootstrapSwitch('size', 'small');
+
+         element.on('switchChange.bootstrapSwitch', function(event, state) {
+           if (ngModel) {
+             scope.$apply(function() {
+               ngModel.$setViewValue(state);
+             });
+           }
+         });
+
+         scope.$watch(attrs.ngModel, function(newValue, oldValue) {
+           element.bootstrapSwitch('state', newValue || false, true);
+         });
+       }
+     };
+   }
+ ]);
 
   QDR.module.config(function ($compileProvider) {
     $compileProvider.aHrefSanitizationWhitelist(/^\s*(https?|ftp|mailto|chrome-extension|file|blob):/);
@@ -126,12 +153,10 @@ var QDR = (function(QDR) {
   }
     // one-time initialization happens in the run function
     // of our module
-  QDR.module.run( ["$log", "QDRService", function ($log, QDRService) {
+  QDR.module.run( ["$log", function ($log) {
     QDR.log = new QDR.logger($log);
     QDR.log.info("*************creating config editor************");
-    QDRService.getSchema(function () {
-      QDR.log.debug("got schema")
-    })
+
   }]);
 
   QDR.module.config(['$qProvider', function ($qProvider) {
@@ -155,3 +180,8 @@ var Leaf = (function () {
     }
     return Leaf;
 })();
+
+// split while collapsing multiple white space characters into one (the way python does it)
+String.prototype.python_split = function (s) {
+  return this.split(/(\s+)/).filter( function(e) { return e.trim().length > 0; } );
+}

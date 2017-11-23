@@ -259,6 +259,25 @@ class Manager(object):
 
         return {"nodes": nodes, "links": links, "topology": topology}
 
+    def GET_POLICY_ROOT(self, request):
+        root = {
+                "name": "Policy",
+                "parent": "null",
+                "type": "policy",
+                "children": [
+                    {
+                        "name": "",
+                        "parent": "Policy",
+                        "add": True,
+                        "type": "vhost"
+                    }
+                ]
+            }
+        return root
+
+    def SAVE_POLICY(self, request):
+        return "saved"
+
     def GET_TOPOLOGY(self, request):
         if self.verbose:
             pprint (self.topology)
@@ -423,6 +442,9 @@ class HttpHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             if response is not None:
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
+                self.send_header("Access-Control-Allow-Origin", "*");
+                self.send_header("Access-Control-Expose-Headers", "Access-Control-Allow-Origin");
+                self.send_header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
                 self.end_headers()
 
                 self.wfile.write(json.dumps(response));
@@ -442,14 +464,14 @@ class ConfigTCPServer(SocketServer.TCPServer):
         self.verbose = verbose
 
 Schema.init()
-parser = argparse.ArgumentParser(description='Read/Write Qpid Dispatch Router config files.')
+parser = argparse.ArgumentParser(description='Read/Write Qpid Dispatch Router policy files.')
 parser.add_argument('-p', "--port", type=int, default=8000, help='port to listen for requests from browser')
 parser.add_argument('-v', "--verbose", action='store_true', help='verbose output')
-parser.add_argument("-t", "--topology", default="config-2", help="which topology to load (default: %(default)s)")
+parser.add_argument("-t", "--policy", default="config-2", help="which policy to load (default: %(default)s)")
 args = parser.parse_args()
 
 try:
-    httpd = ConfigTCPServer(args.port, Manager(args.topology, args.verbose), args.verbose)
+    httpd = ConfigTCPServer(args.port, Manager(args.policy, args.verbose), args.verbose)
     print "serving at port", args.port
     httpd.serve_forever()
 except KeyboardInterrupt:
