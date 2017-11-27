@@ -178,13 +178,14 @@ class DB(object):
             return vrow[0][0]
         return -1
 
-    def update(self, policyvhosts):
-        policy = policyvhosts['policy']
-        cols = self.getTableCols('policy', True)
-        values = self.vals(cols, policy)
-        names = ','.join(['%s=?' % c for c in cols])
-        s = 'UPDATE policy SET %s WHERE _policy_id = 1' % names
-        self.execute(s, values)
+    def update(self, policyvhosts, vhost):
+        if vhost is None:
+            policy = policyvhosts['policy']
+            cols = self.getTableCols('policy', True)
+            values = self.vals(cols, policy)
+            names = ','.join(['%s=?' % c for c in cols])
+            s = 'UPDATE policy SET %s WHERE _policy_id = 1' % names
+            self.execute(s, values)
 
         vhosts = policyvhosts['vhosts']
         for vhost in vhosts:

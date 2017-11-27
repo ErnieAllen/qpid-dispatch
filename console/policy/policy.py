@@ -36,20 +36,20 @@ class Server(MessagingHandler):
         self.url = url
         self.address = address
         self.verbose = verbose
-        self.policy = {'policy': {}, 'vhosts': []}
 
     def on_start(self, event):
         print("Listening on", self.url)
         self.container = event.container
         self.conn = event.container.connect(self.url, properties={u'client_itentifier': u'policy_server'})
         self.receiver = event.container.create_receiver(self.conn, self.address)
+        self.receiver2 = event.container.create_receiver(self.conn, '/bob.com')
+        self.receiver3 = event.container.create_receiver(self.conn, '/alice.com')
         self.server = self.container.create_sender(self.conn, None)
 
     def SAVE_POLICY(self, request, vhost):
-        self.policy = request
         with DB() as db:
-            db.update(self.policy)
-        return u"policy saved from server.py"
+            db.update(request, vhost)
+        return u"policy saved"
 
     def DELETE(self, request, vhost):
         if vhost is not None:
@@ -89,9 +89,22 @@ class Server(MessagingHandler):
 
     def on_message(self, event):
         print("Received", event.message)
+        if not event.message.address:
+            print ('received messages without an address field. ignoring.')
+            return
+
+        # look for multi-tenant request in the form of <group_name>/policy
         vhost, policy = event.message.address.split('/')
         if vhost == '':
-            vhost = None
+            vhost = None    # got request at address /policy
+
+        # for testing, sending to /bob.com or /alice.com simulates bob.com/policy and alice.com/policy
+        if event.message.address != ('/'+self.address):
+            print('event.message.address', event.message.address)
+            print('self.address', self.address)
+            vhost = policy  # set vhost to string after the /
+            print ('setting vhost to ', policy)
+
         op = event.message.properties['operation']
         response = self.operation(op, event.message.body, vhost)
         self.server.send(Message(address=event.message.reply_to, body=response,
