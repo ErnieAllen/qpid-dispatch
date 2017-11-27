@@ -29,6 +29,114 @@ var QDR = (function(QDR) {
   QDR.module.controller("QDR.TopologyController", ['$scope', '$rootScope', 'QDRService', '$location', '$timeout', '$uibModal',
     function($scope, $rootScope, QDRService, $location, $timeout, $uibModal) {
 
+      var address = '/policy'
+
+      var Group = function (d, name, parent) {
+        c = angular.copy(d)
+        c.name = name
+        c.parent = parent
+        c.type = 'group'
+        return c
+      }
+
+      var VHost = function (d, schema) {
+        this.name = d.id
+        this.parent = 'Policy'
+        this.type = 'vhost'
+        for (var attr in d) {
+          if (schema.entityTypes.vhost.attributes[attr] && attr !== 'id') {
+            if (attr === 'groups') {
+              this.children = []
+              for (var group in d['groups']) {
+                this.children.push(new Group(d[attr][group], group, this.name))
+              }
+              this.children.push(new Group({add: true}, '', this.name))
+            } else
+              this[attr] = d[attr]
+          }
+        }
+      }
+
+      var Adapter = function () {}
+      Adapter.treeFromDB = function (dbModel, schema) {
+        var policy = dbModel['policy']
+        var vhosts = dbModel['vhosts']
+        var treeModel = {data: [], level: 'policy'}
+
+        // no policy, use 1st (and only) vhost as tree root
+        if (policy.empty || true) {
+          treeModel.level = 'vhost'
+          treeModel.data = new VHost(vhosts[0], schema)
+        } else {
+          policy.name = 'Policy'
+          policy.type = 'policy'
+          policy.children = []
+
+          for (var i=0; i<vhosts.length; i++) {
+            policy.children.push(new VHost(vhosts[i], schema))
+          }
+          var addVhost = new VHost({id: ''}, schema)
+          addVhost.add = true
+          policy.children.push(addVhost)
+
+          treeModel.data = policy
+        }
+        return treeModel
+      }
+
+      Adapter.DBFromTree = function (treeModel, schema) {
+        var DBModel = {policy: this.policyCopy(treeModel, schema)}
+        DBModel.vhosts = []
+        for (var i=0; i<treeModel.children.length; ++i) {
+          if (!treeModel.children[i].add)
+            DBModel.vhosts.push(this.vhostCopy(treeModel.children[i], schema))
+        }
+        return DBModel
+      }
+      Adapter.policyCopy = function (d, schema) {
+        var c = {}
+        for (var attr in d) {
+          if (schema.entityTypes.policy.attributes[attr] && attr !== 'name')
+            c[attr] = d[attr]
+        }
+        return c
+      }
+      Adapter.vhostCopy = function (d, schema) {
+        var c = {groups: {}}
+        for (var attr in d) {
+          if (attr === 'children') {
+            for (var i=0; i<d.children.length; i++) {
+              if (!d.children[i].add) {
+                var group = this.groupCopy(d.children[i], schema)
+                var groupName = Object.keys(group)[0]
+                c.groups[groupName] = group[groupName]
+              }
+            }
+          } else if (schema.entityTypes.vhost.attributes[attr]) {
+            if (attr !== 'id') {
+              if (attr === 'name')
+                c['id'] = d[attr]
+              else
+                c[attr] = d[attr]
+            }
+          }
+        }
+        return c
+      }
+      Adapter.groupCopy = function (d, schema) {
+        var groupName = d.name
+        var c = {}
+        c[groupName] = {}
+        for (var attr in d) {
+          if (attr !== 'name') {
+            if (schema.entityTypes.group.attributes[attr]) {
+              c[groupName][attr] = d[attr]
+            }
+          }
+        }
+        return c
+      }
+
       var schema;
       var treeData;
       QDRService.management.connection.addConnectAction( function () {
@@ -111,51 +219,16 @@ var QDR = (function(QDR) {
               }
             }
           }
-          var Group = function (d, name, parent) {
-            c = angular.copy(d)
-            c.name = name
-            c.parent = parent
-            c.type = 'group'
-            return c
-          }
-          var VHost = function (d) {
-            this.name = d.id
-            this.parent = 'Policy'
-            this.type = 'vhost'
-            for (var attr in d) {
-              if (schema.entityTypes.vhost.attributes[attr] && attr !== 'id') {
-                if (attr === 'groups') {
-                  this.children = []
-                  for (var group in d['groups']) {
-                    this.children.push(new Group(d[attr][group], group, this.name))
-                  }
-                  this.children.push(new Group({add: true}, '', this.name))
-                } else
-                  this[attr] = d[attr]
-              }
-            }
-          }
-
           console.log("got schema")
-          QDRService.management.connection.send([], "/policy", "GET-POLICY")
+          QDRService.management.connection.send([], address, "GET-POLICY")
             .then( function (success) {
               console.log("got initial policy tree")
-              var policy = success.response['policy']
-              var vhosts = success.response['vhosts']
-
-              policy.name = 'Policy'
-              policy.type = 'policy'
-              policy.children = []
-
-              for (var i=0; i<vhosts.length; i++) {
-                policy.children.push(new VHost(vhosts[i]))
-              }
-              var addVhost = new VHost({id: ''})
-              addVhost.add = true
-              policy.children.push(addVhost)
-
-              treeData = policy
-              initTree()
+              treeModel = Adapter.treeFromDB(success.response, schema)
+              treeData = treeModel.data
+              $scope.topLevel = treeModel.level
+              if ($scope.topLevel === 'vhost')
+                $('.legend.policy').css('display', 'none')
+              initTree($scope.topLevel)
             }, function (error) {
               Core.notification("error", "unable to get initial policy")
             })
@@ -169,52 +242,6 @@ var QDR = (function(QDR) {
 
       $scope.formMode = 'edit'
       $scope.showForm = 'policy'
-
-      var policyCopy = function (d) {
-        var c = {}
-        for (var attr in d) {
-          if (schema.entityTypes.policy.attributes[attr] && attr !== 'name')
-            c[attr] = d[attr]
-        }
-        return c
-      }
-      var vhostCopy = function (d) {
-        var c = {groups: {}}
-        for (var attr in d) {
-          if (attr === 'children') {
-            for (var i=0; i<d.children.length; i++) {
-              if (!d.children[i].add) {
-                var group = groupCopy(d.children[i])
-                var groupName = Object.keys(group)[0]
-                c.groups[groupName] = group[groupName]
-              }
-            }
-          } else if (schema.entityTypes.vhost.attributes[attr]) {
-            if (attr !== 'id') {
-              if (attr === 'name')
-                c['id'] = d[attr]
-              else
-                c[attr] = d[attr]
-            }
-          }
-        }
-        return c
-      }
-      var groupCopy = function (d) {
-        var groupName = d.name
-        var c = {}
-        c[groupName] = {}
-        for (var attr in d) {
-          if (attr !== 'name') {
-            if (schema.entityTypes.group.attributes[attr]) {
-              c[groupName][attr] = d[attr]
-            }
-          }
-        }
-        return c
-      }
-
-
 
 /*
       policy = {
@@ -232,13 +259,8 @@ var QDR = (function(QDR) {
       }
 */
       $scope.savePolicy = function () {
-        var policy = policyCopy(treeData)
-        var vhosts = []
-        for (var i=0; i<treeData.children.length; ++i) {
-          if (!treeData.children[i].add)
-            vhosts.push(vhostCopy(treeData.children[i]))
-        }
-        QDRService.management.connection.send({policy: policy, vhosts: vhosts}, "/policy", "SAVE-POLICY")
+        var DBModel = Adapter.DBFromTree(treeData, schema)
+        QDRService.management.connection.send(DBModel, address, "SAVE-POLICY")
           .then( function (success_response) {
             console.log(success_response.response)
             Core.notification("success", "saved policy")
@@ -247,7 +269,7 @@ var QDR = (function(QDR) {
           })
       }
 
-      var initTree = function () {
+      var initTree = function (level) {
         // association of classes with shapes
         var classesMap = {
             add: "cross",
@@ -281,9 +303,9 @@ var QDR = (function(QDR) {
         root.y0 = 0;
 
         update(root);
-        d3.select('g.policy').classed('selected', true)
+        d3.select('g.'+level).classed('selected', true)
         $timeout( function () {
-          $scope.showForm = 'policy'
+          $scope.showForm = level
           $scope.formData = root
           $scope.shadowData = angular.copy(root)
           $('.all-forms :input:visible:enabled:first').focus()
@@ -518,7 +540,14 @@ var QDR = (function(QDR) {
           }
         }
         $scope.formDelete = function () {
-          QDRService.management.connection.send({type: $scope.showForm, name: $scope.formData['name']}, "/policy", "DELETE")
+          var req = {type: $scope.showForm}
+          if ($scope.showForm === 'vhost')
+            req.vhost = $scope.formData['name']
+          else if ($scope.showForm === 'group') {
+            req.vhost = $scope.formData.parent.name
+            req.group = $scope.formData['name']
+          }
+          QDRService.management.connection.send(req, address, "DELETE")
             .then( function (success_response) {
               console.log(success_response.response)
               if (success_response.response != "OK") {
@@ -618,7 +647,7 @@ var QDR = (function(QDR) {
           var root = scope.$parent.formData.parent
           var id = scope.$parent.formData.id
           var notDuplicate = true;
-          if (modelValue.trim() !== '') {
+          if (modelValue.trim() !== '' && root.children) {
             for (var i=0; i<root.children.length; i++) {
               // skip self
               if (root.children[i].id !== id) {
@@ -640,6 +669,14 @@ var QDR = (function(QDR) {
       restrict: 'A',
       require: 'ngModel',
       link: function(scope, element, attr, ngModel) {
+        var root = scope.$parent.formData.parent
+        var msg = function (group, user, same) {
+          if (!same)
+            scope.$parent.dupUserMsg = "User can be in only one group for this vhost. The user "+user+" was also found in "+group+"."
+          else
+            scope.$parent.dupUserMsg = "The user "+user+" appears in this list multiple times."
+
+        }
         var cmp = function (root, users, id, i) {
           if (!angular.isDefined(root.children[i].users))
             return false
@@ -648,10 +685,7 @@ var QDR = (function(QDR) {
           for (var j=0; j<users.length; j++) {
             found = nusers.some ( function (nuser) {
               if (users.indexOf(nuser) >= 0) {
-                // set which group contains the dup name
-                scope.$parent.dupUserGroup = root.children[i].name
-                // set the name that is duplicated
-                scope.$parent.dupUserName = nuser
+                msg(root.children[i].name, nuser, false)
                 return true
               }
               return false
@@ -666,7 +700,6 @@ var QDR = (function(QDR) {
         ngModel.$validators.duplicateUser = function(modelValue, viewValue) {
           var notDuplicate = true;
           if (modelValue && modelValue.trim() !== '') {
-            var root = scope.$parent.formData.parent
             var id = scope.$parent.formData.id
             // make sure there are no duplicated user names in this group
             var users = modelValue.python_split(' ')
@@ -677,7 +710,15 @@ var QDR = (function(QDR) {
                   notDuplicate = false
                   break
                 }
-
+              } else {
+                // prevent same name appearing twice in this edit field
+                notDuplicate = !users.some(function(user, idx){
+                    if (users.indexOf(user, idx+1) !== -1) {
+                      msg(root.children[i].name, user, true)
+                      return true
+                    }
+                    return false
+                });
               }
             }
           }

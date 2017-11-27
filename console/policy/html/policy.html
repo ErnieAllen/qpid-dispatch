@@ -21,9 +21,11 @@ under the License.
             <div class="legend policy">policy</div>
             <div class="legend vhosts">vhosts</div>
             <div class="legend groups">groups</div>
-            <div class="legend buttons">
-                <button class="btn btn-primary pull-right" ng-click="savePolicy()">Save</button>
+            <!--
+                        <div class="legend buttons">
+                            <button class="btn btn-primary pull-right" ng-click="savePolicy()">Save</button>
             </div>
+            -->
         </div>
     <div class="legend-grid">
         <div class="legend policy"></div>
@@ -79,7 +81,7 @@ under the License.
                                     duplicate-sibling-name
                             >
                             <small id="vhostnamehelp" class="form-text text-muted">
-                                (ie. example.com)
+                                (e.g. example.com)
                             </small>
                             <small ng-messages="editvhost.vhostname.$error" role="alert">
                                 <div ng-message="required">Required</div>
@@ -106,7 +108,7 @@ under the License.
                         </div>
                         <button type="submit" class="btn btn-primary" ng-disabled="editvhost.$invalid || editvhost.$pristine">Apply</button>
                         <button type="cancel" class="btn btn-warning" ng-disabled="!editvhost.$dirty" ng-click="formCancel()">Cancel</button>
-                        <button type="button" class="btn btn-danger" ng-if="formMode == 'edit'" ng-click="formDelete()">Delete</button>
+                        <button type="button" class="btn btn-danger" ng-if="formMode === 'edit' && topLevel === 'policy'" ng-click="formDelete()">Delete</button>
                         <div ng-init="$parent.currentForm = editvhost"></div>
                         <input type="hidden" name="type" ng-model="formData.type">
                     </form>
@@ -153,7 +155,7 @@ under the License.
                             </small>
                             <small ng-messages="editgroup.users.$error" role="alert">
                                 <div ng-message="required">Required if name is not $default</div>
-                                <div ng-message="duplicateUser">User can be in only one group for this vhost. The name {{dupUserName}} was also found in {{dupUserGroup}}.</div>
+                                <div ng-message="duplicateUser">{{dupUserMsg}}</div>
                             </small>
 
                         </div>

@@ -172,6 +172,12 @@ class DB(object):
         s = "REPLACE INTO %s (%s) VALUES (%s);" % (table, names, ','.join(['?'] * len(values)))
         self.execute(s, values)
 
+    def lookupVhostId(self, id):
+        vrow = self.execute('SELECT _vhost_id from vhosts WHERE id = ?', id)
+        if len(vrow) > 0:
+            return vrow[0][0]
+        return -1
+
     def update(self, policyvhosts):
         policy = policyvhosts['policy']
         cols = self.getTableCols('policy', True)
@@ -184,31 +190,32 @@ class DB(object):
         for vhost in vhosts:
             self.replace_record(vhost, 'vhosts')
             # get the _vhost_id of this vhost record
-            _vhost_id = self.execute('SELECT _vhost_id from vhosts WHERE id = ?', vhost['id'])[0][0]
+            _vhost_id = self.lookupVhostId(vhost['id'])
+            if _vhost_id > -1:
+                groups = vhost.get('groups', {})
+                for group in groups:
+                    self.replace_record(groups[group], 'groups', False, [{'field_name': '_vhost_id',
+                                                                          'field_value': _vhost_id},
+                                                                         {'field_name': 'name',
+                                                                          'field_value': group}])
 
-            groups = vhost.get('groups', {})
-            for group in groups:
-                self.replace_record(groups[group], 'groups', False, [{'field_name': '_vhost_id',
-                                                                      'field_value': _vhost_id},
-                                                                     {'field_name': 'name',
-                                                                      'field_value': group}])
-
-    def getVhosts(self):
+    def getVhosts(self, id=None):
         vhostlist = []
         cols = self.getTableCols('vhosts')
         s = 'SELECT %s FROM vhosts;' % ','.join(cols)
         vhosts = self.execute(s)
         for vRow in vhosts:
-            vdict = dict(zip(cols, vRow))
-            vhostlist.append(vdict)
-            vdict['groups'] = {}
+            if id is None or vRow[cols.index('id')] == id:
+                vdict = dict(zip(cols, vRow))
+                vhostlist.append(vdict)
+                vdict['groups'] = {}
 
-            gcols = self.getTableCols('groups')
-            s = 'SELECT %s FROM groups WHERE _vhost_id=?' % ','.join(gcols)
-            groups = self.execute(s, vdict['_vhost_id'])
-            for gRow in groups:
-                gdict = dict(zip(gcols, gRow))
-                vdict['groups'][gdict['name']] = gdict
+                gcols = self.getTableCols('groups')
+                s = 'SELECT %s FROM groups WHERE _vhost_id=?' % ','.join(gcols)
+                groups = self.execute(s, vdict['_vhost_id'])
+                for gRow in groups:
+                    gdict = dict(zip(gcols, gRow))
+                    vdict['groups'][gdict['name']] = gdict
 
         return vhostlist
 
@@ -218,33 +225,20 @@ class DB(object):
         p = self.execute(s)
         return dict(zip(cols, p[0])) if len(p) else {}
 
+
+    def deleteVhost(self, vhostName):
+        s = 'DELETE from vhosts WHERE id is ?;'
+        self.execute(s, vhostName)
+        return u"OK"
+
+    def deleteGroup(self, groupName, vhostId):
+        _vhost_id = self.lookupVhostId(vhostId)
+        s = 'DELETE FROM groups WHERE name IS ? AND _vhost_id IS ?;'
+        self.execute(s, (groupName, _vhost_id))
+        return u"OK"
+
 if __name__ == '__main__':
 
-    schema = DB.schema
-    #setup
-    with DB('policy.db') as db:
-        for table in schema:
-            cols = ', '.join(["%s %s" % (c, schema[table][c]) for c in schema[table]])
-            statement = "CREATE TABLE %s (%s);" % (table, cols)
-            print (statement)
-            print ()
-            db.execute(statement)
-
-    '''
-    #a single statement
-    db.execute(
-        ["INSERT INTO source (id, filename) values (8, 'reference.txt');"])
-
-    #a list of complete statements
-    db.execute(["INSERT INTO query (id, filename) values (8, 'one.txt');",
-                "INSERT INTO query (id, filename) values (9, 'two.txt');"])
-
-    #a list of incomplete statements
-    db.execute(["INSERT INTO query (id, filename) ",
-                "values (10, 'three.txt');"])
-
-    #retrieving multiple query results
-    queries = ['SELECT * FROM source;', 'SELECT * FROM query;']
-    for result in db.execute(queries):
-        print (result)
-    '''
+    # create the db in the current dir
+    with DB() as db:
+        db.create()

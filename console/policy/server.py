@@ -21,7 +21,8 @@
 # modified from qpid-proton/examples/python/server.py
 
 from __future__ import print_function
-import optparse
+import argparse
+
 from proton import Message, Url
 from proton.handlers import MessagingHandler
 from proton.reactor import Container
@@ -30,11 +31,11 @@ from db import DB
 import pdb
 
 class Server(MessagingHandler):
-    def __init__(self, url, address):
+    def __init__(self, url, address, verbose):
         super(Server, self).__init__()
         self.url = url
         self.address = address
-        self.verbose = True
+        self.verbose = verbose
         self.policy = {'policy': {}, 'vhosts': []}
 
     def on_start(self, event):
@@ -44,42 +45,38 @@ class Server(MessagingHandler):
         self.receiver = event.container.create_receiver(self.conn, self.address)
         self.server = self.container.create_sender(self.conn, None)
 
-    def SAVE_POLICY(self, request):
+    def SAVE_POLICY(self, request, vhost):
         self.policy = request
-        with DB('policy.db') as db:
+        with DB() as db:
             db.update(self.policy)
         return u"policy saved from server.py"
 
-    def GET_POLICY(self, request):
-        '''
-        policy = {
-            <global settings>
-        }
-        
-        vhosts =
-        [
-        {
-            id: vhost-name
-            <connection limits>
-            groups: {
-                group-name: {
-                    <user group settings>
-                }
-            }
-        },
-        ...
-        ]
-        :param request:
-        :return: 
-        '''
+    def DELETE(self, request, vhost):
+        if vhost is not None:
+            assert vhost == request['vhost']
         with DB() as db:
-            policy = db.getPolicy()
-            print (policy)
-            vhosts = db.getVhosts()
+            if request['type'] == 'vhost':
+                return db.deleteVhost(request['vhost'])
+            elif request['type'] == 'group':
+                return db.deleteGroup(request['group'], request['vhost'])
+        return unicode('unknown type ' + request['type'])
+
+    def GET_VHOST(self, request, vhost):
+        if vhost is None:
+            vhost = request['name']
+        with DB() as db:
+            return db.getVHosts(vhost)
+
+    def GET_POLICY(self, request, vhost):
+        policy = {'empty': True}
+        with DB() as db:
+            if vhost is None:
+                policy = db.getPolicy()
+            vhosts = db.getVhosts(vhost)
 
         return {'policy': policy, 'vhosts': vhosts}
 
-    def operation(self, op, request):
+    def operation(self, op, request, vhost):
         m = op.replace("-", "_")
         try:
             method = getattr(self, m)
@@ -88,24 +85,27 @@ class Server(MessagingHandler):
             return u'not implemented'
         if self.verbose:
             print ("Got request " + op)
-        return method(request)
+        return method(request, vhost)
 
     def on_message(self, event):
         print("Received", event.message)
+        vhost, policy = event.message.address.split('/')
+        if vhost == '':
+            vhost = None
         op = event.message.properties['operation']
-        response = self.operation(op, event.message.body)
+        response = self.operation(op, event.message.body, vhost)
         self.server.send(Message(address=event.message.reply_to, body=response,
                             correlation_id=event.message.correlation_id))
 
-parser = optparse.OptionParser(usage="usage: %prog [options]")
-parser.add_option("-a", "--address", default="localhost:5672/examples",
-                  help="address from which messages are received (default %default)")
-opts, args = parser.parse_args()
+parser = argparse.ArgumentParser(description='Serve and persist policy options.')
+parser.add_argument("-a", "--address", default="0.0.0.0:20000/policy", help="which policy to load (default: %(default)s)")
+parser.add_argument('-v', "--verbose", action='store_true', help='verbose output')
+args = parser.parse_args()
 
-url = Url(opts.address)
+url = Url(args.address)
 
 try:
-    Container(Server(url, url.path)).run()
+    Container(Server(url, url.path, args.verbose)).run()
 except KeyboardInterrupt: pass
 
 
