@@ -31,6 +31,13 @@ var QDR = (function(QDR) {
 
       var address = '/policy'
 
+      console.log('location.url is ' + $location.url())
+      var tenant = $location.url().split('=')
+      if (tenant && tenant.length > 1) {
+        address = '/' + tenant[1]
+      }
+      console.log('setting address to '+ address)
+
       var Group = function (d, name, parent) {
         c = angular.copy(d)
         c.name = name
@@ -64,7 +71,7 @@ var QDR = (function(QDR) {
         var treeModel = {data: [], level: 'policy'}
 
         // no policy, use 1st (and only) vhost as tree root
-        if (policy.empty || true) {
+        if (policy.empty) {
           treeModel.level = 'vhost'
           treeModel.data = new VHost(vhosts[0], schema)
         } else {
@@ -85,11 +92,15 @@ var QDR = (function(QDR) {
       }
 
       Adapter.DBFromTree = function (treeModel, schema) {
-        var DBModel = {policy: this.policyCopy(treeModel, schema)}
-        DBModel.vhosts = []
-        for (var i=0; i<treeModel.children.length; ++i) {
-          if (!treeModel.children[i].add)
-            DBModel.vhosts.push(this.vhostCopy(treeModel.children[i], schema))
+        var DBModel = {vhosts: []}
+        if (treeModel.type === 'vhost') {
+          DBModel.vhosts.push(this.vhostCopy(treeModel, schema))
+        } else {
+          DBModel.policy = this.policyCopy(treeModel, schema)
+          for (var i=0; i<treeModel.children.length; ++i) {
+            if (!treeModel.children[i].add)
+              DBModel.vhosts.push(this.vhostCopy(treeModel.children[i], schema))
+          }
         }
         return DBModel
       }
