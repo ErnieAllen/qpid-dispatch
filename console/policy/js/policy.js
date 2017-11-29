@@ -680,7 +680,6 @@ var QDR = (function(QDR) {
       restrict: 'A',
       require: 'ngModel',
       link: function(scope, element, attr, ngModel) {
-        var root = scope.$parent.formData.parent
         var msg = function (group, user, same) {
           if (!same)
             scope.$parent.dupUserMsg = "User can be in only one group for this vhost. The user "+user+" was also found in "+group+"."
@@ -709,6 +708,7 @@ var QDR = (function(QDR) {
         }
 
         ngModel.$validators.duplicateUser = function(modelValue, viewValue) {
+          var root = scope.$parent.formData.parent
           var notDuplicate = true;
           if (modelValue && modelValue.trim() !== '') {
             var id = scope.$parent.formData.id
