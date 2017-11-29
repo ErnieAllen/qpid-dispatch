@@ -58,14 +58,16 @@ class DB(object):
                    'create_table': 'groups'}
     ]
 
-    def __init__(self, database='policy.db'):
+    def __init__(self, database='policy.db', verbose=False):
         """Initialize a new or connect to an existing database.
         """
 
         # the database filename
         self.database = database
         self.connection = None
+        self.verbose = verbose
 
+    # __enter__ and __exit__ allow this object to be used in a with clouse
     def __enter__(self):
         self.connect()
         return self
@@ -74,12 +76,14 @@ class DB(object):
         self.close()
 
     def connect(self):
-        """Connect to the SQLite3 database."""
+        """Create or connect to the SQLite3 database."""
 
         if not os.path.isfile(self.database):
             self.create()
         self.connection = sqlite3.connect(self.database)
         self.cursor = self.connection.cursor()
+        # turn on foreign keys so delete cascade will remove group records when vhost is deleted
+        self.execute("PRAGMA foreign_keys=ON")
 
     def close(self):
         """Close the SQLite3 database."""
@@ -97,6 +101,8 @@ class DB(object):
         self.close()
 
         # create the tables
+        if self.verbose:
+            print ("creating databse")
         with DB() as db:
             for table in schema:
                 cols = ', '.join(["%s %s" % (c, schema[table][c]) for c in schema[table]])
@@ -121,21 +127,17 @@ class DB(object):
             db.execute(s)
 
     def execute(self, statement, values=None):
-        """Execute complete SQL statement.
+        """Execute SQL statement."""
 
-        Selected data is returned as a list of query results. Example:
-
-        for result in db.execute(query):
-            for row in result:
-                print row
-        """
-        print ("executing: " + statement)
+        if self.verbose:
+            print ("executing: " + statement)
         try:
             statement = statement.strip()
             if values is None:
                 self.cursor.execute(statement)
             else:
-                print ("with values:  ", values)
+                if self.verbose:
+                    print ("with values:  ", values)
                 if type(values) not in (tuple, list):
                     values = [values]
                 self.cursor.execute(statement, values)
