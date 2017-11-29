@@ -28,7 +28,6 @@ from proton.handlers import MessagingHandler
 from proton.reactor import Container
 
 from db import DB
-import pdb
 
 class Server(MessagingHandler):
     def __init__(self, url, address, verbose):
@@ -38,7 +37,8 @@ class Server(MessagingHandler):
         self.verbose = verbose
 
     def on_start(self, event):
-        print("Listening on", self.url)
+        if self.verbose:
+            print("Listening on", self.url)
         self.container = event.container
         self.conn = event.container.connect(self.url, properties={u'client_itentifier': u'policy_server'})
         self.receiver = event.container.create_receiver(self.conn, self.address)
@@ -47,14 +47,14 @@ class Server(MessagingHandler):
         self.server = self.container.create_sender(self.conn, None)
 
     def SAVE_POLICY(self, request, vhost):
-        with DB() as db:
+        with DB(verbose=self.verbose) as db:
             db.update(request, vhost)
         return u"policy saved"
 
     def DELETE(self, request, vhost):
         if vhost is not None:
             assert vhost == request['vhost']
-        with DB() as db:
+        with DB(verbose=self.verbose) as db:
             if request['type'] == 'vhost':
                 return db.deleteVhost(request['vhost'])
             elif request['type'] == 'group':
@@ -64,12 +64,12 @@ class Server(MessagingHandler):
     def GET_VHOST(self, request, vhost):
         if vhost is None:
             vhost = request['name']
-        with DB() as db:
+        with DB(verbose=self.verbose) as db:
             return db.getVHosts(vhost)
 
     def GET_POLICY(self, request, vhost):
         policy = {'empty': True}
-        with DB() as db:
+        with DB(verbose=self.verbose) as db:
             if vhost is None:
                 policy = db.getPolicy()
             vhosts = db.getVhosts(vhost)
@@ -110,8 +110,8 @@ class Server(MessagingHandler):
         self.server.send(Message(address=event.message.reply_to, body=response,
                             correlation_id=event.message.correlation_id))
 
-parser = argparse.ArgumentParser(description='Serve and persist policy options.')
-parser.add_argument("-a", "--address", default="0.0.0.0:20000/policy", help="which policy to load (default: %(default)s)")
+parser = argparse.ArgumentParser(description='Serve and persist dispatch router policy settings.')
+parser.add_argument("-a", "--address", default="0.0.0.0:20000/policy", help="Addres on which to listen for policy requests (default: %(default)s)")
 parser.add_argument('-v', "--verbose", action='store_true', help='verbose output')
 args = parser.parse_args()
 
