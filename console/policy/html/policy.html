@@ -56,7 +56,7 @@ under the License.
                             <input name="defaultVhost" type="text" class="form-control" id="defaultVhost" placeholder="Defaults to $default" ng-model="formData.defaultVHost">
                         </div>
                         <button type="submit" class="btn btn-primary" ng-disabled="editpolicy.$invalid || editpolicy.$pristine">Apply</button>
-                        <button type="cancel" class="btn btn-warning" ng-disabled="!editpolicy.$dirty" ng-click="formCancel()">Cancel</button>
+                        <button type="button" class="btn btn-warning" ng-disabled="!editpolicy.$dirty" ng-click="formCancel()">Cancel</button>
                         <span ng-if="editpolicy.$error.unapplied" class="form-dirty"><== There are unapplied changes. Apply or Cancel before leaving this form.</span>
                         <div ng-init="$parent.currentForm = editpolicy"></div>
                         <input type="hidden" name="type" ng-model="formData.type">
@@ -107,7 +107,7 @@ under the License.
                             </label>
                         </div>
                         <button type="submit" class="btn btn-primary" ng-disabled="editvhost.$invalid || editvhost.$pristine">Apply</button>
-                        <button type="cancel" class="btn btn-warning" ng-disabled="!editvhost.$dirty" ng-click="formCancel()">Cancel</button>
+                        <button type="button" class="btn btn-warning" ng-disabled="!editvhost.$dirty" ng-click="formCancel()">Cancel</button>
                         <button type="button" class="btn btn-danger" ng-if="formMode === 'edit' && topLevel === 'policy'" ng-click="formDelete()">Delete</button>
                         <div ng-init="$parent.currentForm = editvhost"></div>
                         <input type="hidden" name="type" ng-model="formData.type">
@@ -222,7 +222,7 @@ under the License.
                             <small class="form-text text-muted"><div>List of Target addresses allowed when creating sending links. This list may be expressed as a CSV string or as a list of strings. An empty list denies all access.</div></small>
                         </div>
                         <button type="submit" class="btn btn-primary" ng-disabled="editgroup.$invalid || editgroup.$pristine">Apply</button>
-                        <button type="cancel" class="btn btn-warning" ng-disabled="!editgroup.$dirty" ng-click="formCancel()">Cancel</button>
+                        <button type="button" class="btn btn-warning" ng-disabled="!editgroup.$dirty" ng-click="formCancel()">Cancel</button>
                         <button type="button" class="btn btn-danger" ng-if="formMode == 'edit'" ng-click="formDelete()">Delete</button>
                         <div ng-init="$parent.currentForm = editgroup"></div>
                         <input type="hidden" name="type" ng-model="formData.type">
