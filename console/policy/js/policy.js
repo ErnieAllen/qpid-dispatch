@@ -150,6 +150,9 @@ var QDR = (function(QDR) {
 
       var schema;
       var treeData;
+      var host = $location.host()
+      var port = $location.port()
+      var connectOptions = {address: host, port: port, reconnect: true, properties: {client_id: 'policy GUI'}}
       QDRService.management.connection.addConnectAction( function () {
         QDR.log.info("connected to dispatch network on " + host + ":" + port)
 
@@ -231,36 +234,25 @@ var QDR = (function(QDR) {
             }
           }
           console.log("got schema")
-
-          QDRService.policy.send(port, address, {operation: 'GET-POLICY'}, function (response) {
-            console.log("got initial policy tree")
-            treeModel = Adapter.treeFromDB(response, schema)
-            treeData = treeModel.data
-            $scope.topLevel = treeModel.level
-            if ($scope.topLevel === 'vhost')
-              $('.legend.policy').css('display', 'none')
-            initTree($scope.topLevel)
+          QDRService.policy.connection.addConnectAction( function () {
+            QDRService.policy.connection.send([], undefined, 'GET-POLICY')
+              .then( function (success) {
+                console.log("got initial policy tree")
+                treeModel = Adapter.treeFromDB(success.response, schema)
+                treeData = treeModel.data
+                $scope.topLevel = treeModel.level
+                if ($scope.topLevel === 'vhost')
+                  $('.legend.policy').css('display', 'none')
+                initTree($scope.topLevel)
+              })
           })
-/*
-          QDRService.policy.connection.send([], undefined, "GET-POLICY")
-            .then( function (success) {
-              console.log("got initial policy tree")
-              treeModel = Adapter.treeFromDB(success.response, schema)
-              treeData = treeModel.data
-              $scope.topLevel = treeModel.level
-              if ($scope.topLevel === 'vhost')
-                $('.legend.policy').css('display', 'none')
-              initTree($scope.topLevel)
-            }, function (error) {
-              Core.notification("error", "unable to get initial policy")
-            })
-*/
+          connectOptions.properties = {client_id: 'policy linkRoute'}
+          connectOptions.sender_address = address
+          QDRService.policy.connection.connect(connectOptions)
         })
 
       })
-      var host = $location.host()
-      var port = $location.port()
-      var connectOptions = {address: host, port: port, reconnect: true, properties: {client_id: 'policy GUI'}}
+      // connect to the router using the host:port of this web page
       QDRService.management.connection.connect(connectOptions)
 
       $scope.formMode = 'edit'
@@ -283,7 +275,7 @@ var QDR = (function(QDR) {
 */
       $scope.savePolicy = function () {
         var DBModel = Adapter.DBFromTree(treeData, schema)
-        QDRService.management.connection.send(DBModel, address, "SAVE-POLICY")
+        QDRService.policy.connection.send(DBModel, address, "SAVE-POLICY")
           .then( function (success_response) {
             console.log(success_response.response)
             Core.notification("success", "saved policy")

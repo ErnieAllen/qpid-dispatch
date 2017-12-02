@@ -25,68 +25,11 @@ var QDR = (function(QDR) {
   // the server in the background
   QDR.module.factory("QDRService", ['$rootScope', '$http', '$timeout', '$resource', '$location', function($rootScope, $http, $timeout, $resource, $location) {
 
-
     var dm = require("dispatch-management")
-    var container = require('rhea');
-
-
-    var Policy = function () {
-      this.confirmed = 0
-      this.sent = 0
-      this.total = 1
-      this.msg = undefined
-      container.on('sendable', function (context) {
-          console.log('sendable msg=' + this.msg + ' sent:' + this.sent + ' total:' + this.total + ' sendable():' + context.sender.sendable())
-          this.msg.reply_to = this.receiver.remote.attach.source.address
-          console.log('  reply_to is: ' + this.msg.reply_to)
-          this.msg.application_properties = {operation: this.msg.operation}
-          this.msg.message_id = this.sent
-          this.body = []
-          while (context.sender.sendable() && this.sent < this.total) {
-              this.sent++;
-              console.log('sent ' + this.sent);
-              context.sender.send(this.msg)
-          }
-      }.bind(this));
-      container.on('accepted', function (context) {
-          if (++this.confirmed === this.total) {
-              console.log("all messages confirmed")
-              //context.connection.close()
-          }
-      }.bind(this));
-      container.on('disconnected', function (context) {
-          this.confirmed = 0
-          this.sent = 0
-          this.total = 1
-      }.bind(this));
-      container.on("message", function (context) {
-          console.log('got a message: ' + context.message.body);
-          this.callback(context.message.body)
-          context.connection.close()
-      }.bind(this))
-    }
-    Policy.prototype.send = function (port, node, msg, callback) {
-      this.msg = msg
-      this.callback = callback
-      var ws = container.websocket_connect(WebSocket);
-      var server = 'ws://0.0.0.0:' + port
-      var connection = container.connect({"connection_details": ws(server, ["binary", "AMQPWSB10", "amqp"]), "reconnect":false});
-      //node = 'bob.com/policy'
-      this.receiver = connection.open_receiver({source: {dynamic: true}});
-      this.receiver.on('receiver_open', (function(context) {
-        connection.open_sender(node);
-      }).bind(this))
-
-      console.log('opened sender to ' + node + ' msg:' + msg)
-      //container.connect({'port':port}).open_sender(node);
-    }
-
-
     var self = {
 
-      //policy: new dm.Management($location.protocol()),
-      policy: new Policy(),
-      management: new dm.Management($location.protocol()),
+      policy: new dm.Management($location.protocol()),      // linkRouted connection to policy server
+      management: new dm.Management($location.protocol()),  // connection to router
       utilities: dm.Utilities,
 
       humanify: function(s) {

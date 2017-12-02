@@ -20,10 +20,9 @@
 from __future__ import print_function
 import sqlite3
 import os
-import pdb
 
 class DB(object):
-    """DB initializes and manipulates SQLite3 databases."""
+    """ DB initialize and update SQLite3 database """
     schema = {
         'policy': {'_policy_id': 'INTEGER PRIMARY KEY AUTOINCREMENT',
                    'maxConnections': 'INTEGER',
@@ -59,10 +58,8 @@ class DB(object):
     ]
 
     def __init__(self, database='policy.db', verbose=False):
-        """Initialize a new or connect to an existing database.
-        """
+        """ Initialize a new or connect to an existing database. """
 
-        # the database filename
         self.database = database
         self.connection = None
         self.verbose = verbose
@@ -76,17 +73,17 @@ class DB(object):
         self.close()
 
     def connect(self):
-        """Create or connect to the SQLite3 database."""
+        """ Create or connect to the database. """
 
         if not os.path.isfile(self.database):
-            self.create()
+            self.create()   # or we could raise an exception
         self.connection = sqlite3.connect(self.database)
         self.cursor = self.connection.cursor()
         # turn on foreign keys so delete cascade will remove group records when vhost is deleted
         self.execute("PRAGMA foreign_keys=ON")
 
     def close(self):
-        """Close the SQLite3 database."""
+        """ Close the database. """
 
         if self.connection:
             self.connection.commit()
@@ -94,6 +91,8 @@ class DB(object):
             self.connection = None
 
     def create(self):
+        """ Cleate the database from the class schema. """
+
         schema = DB.schema
         # create the file
         self.connection = sqlite3.connect(self.database)
@@ -127,25 +126,20 @@ class DB(object):
             db.execute(s)
 
     def execute(self, statement, values=None):
-        """Execute SQL statement."""
+        """ Execute SQL. """
 
         if self.verbose:
             print ("executing: " + statement)
-        try:
-            statement = statement.strip()
-            if values is None:
-                self.cursor.execute(statement)
-            else:
-                if self.verbose:
-                    print ("with values:  ", values)
-                if type(values) not in (tuple, list):
-                    values = [values]
-                self.cursor.execute(statement, values)
-            # retrieve selected data
-            return self.cursor.fetchall()
-
-        except sqlite3.Error as error:
-            raise error
+        statement = statement.strip()
+        if values is None:
+            self.cursor.execute(statement)
+        else:
+            if self.verbose:
+                print ("  with values:  ", values)
+            if type(values) not in (tuple, list):
+                values = [values]
+            self.cursor.execute(statement, values)
+        return self.cursor.fetchall()
 
     def getTableCols(self, table, filter=False):
         return sorted([n for n in DB.schema[table] if not filter or not n.startswith('_')])

@@ -17,6 +17,7 @@
   "dependencies": {
     "angular": "^1.6.6",
     "angular-animate": "^1.6.6",
+    "angular-bootstrap-switch": "^0.5.2",
     "angular-messages": "^1.6.6",
     "angular-resource": "^1.6.6",
     "angular-sanitize": "^1.6.6",
@@ -28,8 +29,7 @@
     "jquery-ui-dist": "^1.12.1",
     "jquery-ui-themes": "^1.12.0",
     "notifyjs-browser": "^0.4.2",
-    "patternfly": "^3.28.1",
-    "rhea": "^0.2.8"
+    "patternfly": "^3.28.1"
   },
   "devDependencies": {},
   "repository": {
