@@ -30,21 +30,40 @@ from proton.reactor import Container
 from db import DB
 
 class Server(MessagingHandler):
-    def __init__(self, url, address, verbose):
+    def __init__(self, url, verbose):
         super(Server, self).__init__()
         self.url = url
-        self.address = address
         self.verbose = verbose
 
     def on_start(self, event):
         if self.verbose:
             print("Listening on", self.url)
-        self.container = event.container
-        self.conn = event.container.connect(self.url, properties={u'client_itentifier': u'policy_server'})
-        self.receiver = event.container.create_receiver(self.conn, self.address)
-        self.receiver2 = event.container.create_receiver(self.conn, '/bob.com')
-        self.receiver3 = event.container.create_receiver(self.conn, '/alice.com')
-        self.server = self.container.create_sender(self.conn, None)
+        self.acceptor = event.container.listen(self.url)
+
+    def on_link_opening(self, event):
+        if event.link.remote_target.address:
+            event.link.target.address = event.link.remote_target.address
+            self.server = event.container.create_sender(event.connection)
+
+    def on_message(self, event):
+        print("Received", event.message)
+        targetAddress = event.context.link.target.address
+
+        # look for multi-tenant request in the form of /<group_name>/policy
+        if self.verbose:
+            print ('  target.address', targetAddress)
+        parts = targetAddress.split('/')
+        vhost = parts[-2]
+        policy = parts[-1]
+        if vhost == '':
+            vhost = None    # got request at address /policy
+
+        op = event.message.properties['operation']
+        if self.verbose:
+            print ('vhost', vhost, 'policy', policy, 'operation', op)
+        response = self.operation(op, event.message.body, vhost)
+        self.server.send(Message(address=event.message.reply_to, body=response,
+                                 correlation_id=event.message.correlation_id))
 
     def SAVE_POLICY(self, request, vhost):
         with DB(verbose=self.verbose) as db:
@@ -87,38 +106,14 @@ class Server(MessagingHandler):
             print ("Got request " + op)
         return method(request, vhost)
 
-    def on_message(self, event):
-        print("Received", event.message)
-        if not event.message.address:
-            print ('received messages without an address field. ignoring.')
-            return
-
-        # look for multi-tenant request in the form of <group_name>/policy
-        vhost, policy = event.message.address.split('/')
-        if vhost == '':
-            vhost = None    # got request at address /policy
-
-        # for testing, sending to /bob.com or /alice.com simulates bob.com/policy and alice.com/policy
-        if event.message.address != ('/'+self.address):
-            print('event.message.address', event.message.address)
-            print('self.address', self.address)
-            vhost = policy  # set vhost to string after the /
-            print ('setting vhost to ', policy)
-
-        op = event.message.properties['operation']
-        response = self.operation(op, event.message.body, vhost)
-        self.server.send(Message(address=event.message.reply_to, body=response,
-                            correlation_id=event.message.correlation_id))
-
 parser = argparse.ArgumentParser(description='Serve and persist dispatch router policy settings.')
-parser.add_argument("-a", "--address", default="0.0.0.0:20000/policy", help="Addres on which to listen for policy requests (default: %(default)s)")
+parser.add_argument("-a", "--address", default="0.0.0.0:25674", help="Addres on which to listen for policy requests (default: %(default)s)")
 parser.add_argument('-v', "--verbose", action='store_true', help='verbose output')
 args = parser.parse_args()
 
 url = Url(args.address)
-
 try:
-    Container(Server(url, url.path, args.verbose)).run()
+    Container(Server(url, True)).run()
 except KeyboardInterrupt: pass
 
 

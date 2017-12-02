@@ -28,7 +28,8 @@
     "jquery-ui-dist": "^1.12.1",
     "jquery-ui-themes": "^1.12.0",
     "notifyjs-browser": "^0.4.2",
-    "patternfly": "^3.28.1"
+    "patternfly": "^3.28.1",
+    "rhea": "^0.2.8"
   },
   "devDependencies": {},
   "repository": {

@@ -34,7 +34,7 @@ var QDR = (function(QDR) {
       console.log('location.url is ' + $location.url())
       var tenant = $location.url().split('=')
       if (tenant && tenant.length > 1) {
-        address = '/' + tenant[1]
+        address = '/' + tenant[1] + '/policy'
       }
       console.log('setting address to '+ address)
 
@@ -231,7 +231,18 @@ var QDR = (function(QDR) {
             }
           }
           console.log("got schema")
-          QDRService.management.connection.send([], address, "GET-POLICY")
+
+          QDRService.policy.send(port, address, {operation: 'GET-POLICY'}, function (response) {
+            console.log("got initial policy tree")
+            treeModel = Adapter.treeFromDB(response, schema)
+            treeData = treeModel.data
+            $scope.topLevel = treeModel.level
+            if ($scope.topLevel === 'vhost')
+              $('.legend.policy').css('display', 'none')
+            initTree($scope.topLevel)
+          })
+/*
+          QDRService.policy.connection.send([], undefined, "GET-POLICY")
             .then( function (success) {
               console.log("got initial policy tree")
               treeModel = Adapter.treeFromDB(success.response, schema)
@@ -243,12 +254,13 @@ var QDR = (function(QDR) {
             }, function (error) {
               Core.notification("error", "unable to get initial policy")
             })
+*/
         })
 
       })
       var host = $location.host()
       var port = $location.port()
-      var connectOptions = {address: host, port: port, reconnect: true}
+      var connectOptions = {address: host, port: port, reconnect: true, properties: {client_id: 'policy GUI'}}
       QDRService.management.connection.connect(connectOptions)
 
       $scope.formMode = 'edit'
