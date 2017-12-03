@@ -84,26 +84,23 @@ class Server(MessagingHandler):
     def on_start(self, event):
         if self.verbose:
             print("Listening on", self.url)
-        self.acceptor = event.container.listen(self.url)
+        event.container.listen(self.url)
 
     def on_link_opening(self, event):
         if event.link.remote_target.address:
             if self.verbose:
-                print("opening remote link", event.link.remote_target.address, "and creeating return sender")
-            event.link.target.address = event.link.remote_target.address
-            self.server = event.container.create_sender(event.connection)
+                print("opening remote link", event.link.remote_target.address)
 
     def on_message(self, event):
         if self.verbose:
             print("Received", event.message)
-        targetAddress = event.context.link.target.address
+        targetAddress = event.link.remote_target.address
 
         # look for multi-tenant request in the form of /<group_name>/policy
         if self.verbose:
             print ('  target.address', targetAddress)
         parts = targetAddress.split('/')
         vhost = parts[-2]
-        policy = parts[-1]
         if vhost == '':
             vhost = None    # got request at address /policy
 
@@ -111,8 +108,11 @@ class Server(MessagingHandler):
         response = self.operations.do_op(op, event.message.body, vhost)
         if self.verbose:
             print ('  sending response to', event.message.reply_to)
-        self.server.send(Message(address=event.message.reply_to, body=response,
+
+        sender = event.container.create_sender(event.connection)
+        sender.send(Message(address=event.message.reply_to, body=response,
                                  correlation_id=event.message.correlation_id))
+        sender.close()
 
 parser = argparse.ArgumentParser(description='Serve and persist dispatch router policy settings.')
 parser.add_argument("-a", "--address", default="0.0.0.0:25674", help="Addres on which to listen for policy requests (default: %(default)s)")
