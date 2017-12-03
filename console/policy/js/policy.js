@@ -554,7 +554,7 @@ var QDR = (function(QDR) {
               d[dattr] = d[dattr].trim()
           }
         }
-        $scope.formDelete = function () {
+        $scope.formDelete = function (d) {
           var req = {type: $scope.showForm}
           if ($scope.showForm === 'vhost')
             req.vhost = $scope.formData['name']
@@ -569,8 +569,16 @@ var QDR = (function(QDR) {
                 Core.notification("error", "delete failed: " + success_response.response)
               } else
                 Core.notification("success", $scope.showForm + " deleted")
+                // find this tree node in the parent's children list
+                for (var i=0; i<d.parent.children.length; i++) {
+                  if (d.name === d.parent.children[i].name) {
+                    d.parent.children.splice(i, 1)
+                    update(d.parent)
+                    break;
+                  }
+                }
             }, function (error_response) {
-              Core.notification("error", "save policy failed")
+              Core.notification("error", "delete failed")
             })
 
         }
@@ -610,6 +618,7 @@ var QDR = (function(QDR) {
             }
             revert($scope.shadowData, d)
 
+            // add the new node in the 2nd to last position to preserve the Add node at the end
             d.parent.children.splice(d.parent.children.length-1, 0, n)
 
             update(d.parent)

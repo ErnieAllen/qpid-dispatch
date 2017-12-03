@@ -108,7 +108,7 @@ under the License.
                         </div>
                         <button type="submit" class="btn btn-primary" ng-disabled="editvhost.$invalid || editvhost.$pristine">Apply</button>
                         <button type="button" class="btn btn-warning" ng-disabled="!editvhost.$dirty" ng-click="formCancel()">Cancel</button>
-                        <button type="button" class="btn btn-danger" ng-if="formMode === 'edit' && topLevel === 'policy'" ng-click="formDelete()">Delete</button>
+                        <button type="button" class="btn btn-danger" ng-if="formMode === 'edit' && topLevel === 'policy'" ng-click="formDelete(formData)">Delete</button>
                         <div ng-init="$parent.currentForm = editvhost"></div>
                         <input type="hidden" name="type" ng-model="formData.type">
                     </form>
@@ -223,7 +223,7 @@ under the License.
                         </div>
                         <button type="submit" class="btn btn-primary" ng-disabled="editgroup.$invalid || editgroup.$pristine">Apply</button>
                         <button type="button" class="btn btn-warning" ng-disabled="!editgroup.$dirty" ng-click="formCancel()">Cancel</button>
-                        <button type="button" class="btn btn-danger" ng-if="formMode == 'edit'" ng-click="formDelete()">Delete</button>
+                        <button type="button" class="btn btn-danger" ng-if="formMode == 'edit'" ng-click="formDelete(formData)">Delete</button>
                         <div ng-init="$parent.currentForm = editgroup"></div>
                         <input type="hidden" name="type" ng-model="formData.type">
                     </form>
