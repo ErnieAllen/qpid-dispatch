@@ -371,7 +371,7 @@ var QDR = (function(QDR) {
               if (d.add) {
                 return "Click to add a " + d.type
               }
-            return "Clock to edit this " + d.type
+            return "Click to edit this " + d.type
             })
 
           //d3.selectAll()
@@ -475,8 +475,8 @@ var QDR = (function(QDR) {
         function click(d) {
           var selected = d3.select(this).classed("selected")
           // clicked on the current node
-          if (selected)
-            return
+          //if (selected)
+          //  return
 
           $timeout( (function () {
             // remove all selected classes from all nodes
@@ -486,7 +486,6 @@ var QDR = (function(QDR) {
             // set selected on this node
             d3.select(this).classed("selected", true)
             showForm(d)
-            $scope.formMode = d.add ? 'add' : 'edit'
             $('.all-forms :input:visible:enabled:first').focus()
           }).bind(this))
           //$scope.validateName(d.type)
@@ -506,6 +505,7 @@ var QDR = (function(QDR) {
         var showForm = function (d) {
           $scope.showForm = d.type
           $scope.formData = d
+          $scope.formMode = d.add ? 'add' : 'edit'
           $scope.shadowData = angular.copy(d)
           // let new form load before accessing its elements
           $timeout( function () {
@@ -574,6 +574,10 @@ var QDR = (function(QDR) {
                   if (d.name === d.parent.children[i].name) {
                     d.parent.children.splice(i, 1)
                     update(d.parent)
+                    $timeout( function () {
+                      var node = d3.selectAll('.node.'+d.parent.type).filter(function(g){return d.parent.name === g.name}).node();
+                      click.call(node, d.parent)
+                    })
                     break;
                   }
                 }
