@@ -562,7 +562,7 @@ var QDR = (function(QDR) {
             req.vhost = $scope.formData.parent.name
             req.group = $scope.formData['name']
           }
-          QDRService.management.connection.send(req, address, "DELETE")
+          QDRService.policy.connection.send(req, address, "DELETE")
             .then( function (success_response) {
               console.log(success_response.response)
               if (success_response.response != "OK") {
