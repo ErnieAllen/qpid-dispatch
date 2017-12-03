@@ -11,5 +11,11 @@ Installation:
 Help/Documentation:
   - do a README
 
+GUI:
+  - refresh tree after DELETE
+  - reget tree after any operation and animate changes
+  - more testing
+  - sort $default to top of tree level
+  - reuse management connection and just create a sender and receiver for policy messages
 
 
