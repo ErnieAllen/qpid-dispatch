@@ -29,289 +29,83 @@ var QDR = (function(QDR) {
   QDR.module.controller("QDR.TopologyController", ['$scope', '$rootScope', 'QDRService', '$location', '$timeout', '$uibModal',
     function($scope, $rootScope, QDRService, $location, $timeout, $uibModal) {
 
-      var address = '/policy'
+      var Adapter = Adapter_wrapper()                     // converts between the database model and the tree model
+      var Policy = Policy_wrapper(QDRService, $location)  // sends requests to policy service
+      var schema;   // router schema used to validate form entries and filter out UI decoration of the tree data
+      var treeData; // working copy of the data needed to draw the tree
 
-      console.log('location.url is ' + $location.url())
-      var tenant = $location.url().split('=')
-      if (tenant && tenant.length > 1) {
-        address = '/' + tenant[1] + '/policy'
-      }
-      console.log('setting address to '+ address)
-
-      var Group = function (d, name, parent) {
-        c = angular.copy(d)
-        c.name = name
-        c.parent = parent
-        c.type = 'group'
-        return c
-      }
-
-      var VHost = function (d, schema) {
-        this.name = d.id
-        this.parent = 'Policy'
-        this.type = 'vhost'
-        for (var attr in d) {
-          if (schema.entityTypes.vhost.attributes[attr] && attr !== 'id') {
-            if (attr === 'groups') {
-              this.children = []
-              for (var group in d['groups']) {
-                this.children.push(new Group(d[attr][group], group, this.name))
-              }
-              this.children.push(new Group({add: true}, '', this.name))
-            } else
-              this[attr] = d[attr]
-          }
-        }
-      }
-
-      var Adapter = function () {}
-      Adapter.treeFromDB = function (dbModel, schema) {
-        var policy = dbModel['policy']
-        var vhosts = dbModel['vhosts']
-        var treeModel = {data: [], level: 'policy'}
-
-        // no policy, use 1st (and only) vhost as tree root
-        if (policy.empty) {
-          treeModel.level = 'vhost'
-          treeModel.data = new VHost(vhosts[0], schema)
-        } else {
-          policy.name = 'Policy'
-          policy.type = 'policy'
-          policy.children = []
-
-          for (var i=0; i<vhosts.length; i++) {
-            policy.children.push(new VHost(vhosts[i], schema))
-          }
-          var addVhost = new VHost({id: ''}, schema)
-          addVhost.add = true
-          policy.children.push(addVhost)
-
-          treeModel.data = policy
-        }
-        return treeModel
-      }
-
-      Adapter.DBFromTree = function (treeModel, schema) {
-        var DBModel = {vhosts: []}
-        if (treeModel.type === 'vhost') {
-          DBModel.vhosts.push(this.vhostCopy(treeModel, schema))
-        } else {
-          DBModel.policy = this.policyCopy(treeModel, schema)
-          for (var i=0; i<treeModel.children.length; ++i) {
-            if (!treeModel.children[i].add)
-              DBModel.vhosts.push(this.vhostCopy(treeModel.children[i], schema))
-          }
-        }
-        return DBModel
-      }
-      Adapter.policyCopy = function (d, schema) {
-        var c = {}
-        for (var attr in d) {
-          if (schema.entityTypes.policy.attributes[attr] && attr !== 'name')
-            c[attr] = d[attr]
-        }
-        return c
-      }
-      Adapter.vhostCopy = function (d, schema) {
-        var c = {groups: {}}
-        for (var attr in d) {
-          if (attr === 'children') {
-            for (var i=0; i<d.children.length; i++) {
-              if (!d.children[i].add) {
-                var group = this.groupCopy(d.children[i], schema)
-                var groupName = Object.keys(group)[0]
-                c.groups[groupName] = group[groupName]
-              }
-            }
-          } else if (schema.entityTypes.vhost.attributes[attr]) {
-            if (attr !== 'id') {
-              if (attr === 'name')
-                c['id'] = d[attr]
-              else
-                c[attr] = d[attr]
-            }
-          }
-        }
-        return c
-      }
-      Adapter.groupCopy = function (d, schema) {
-        var groupName = d.name
-        var c = {}
-        c[groupName] = {}
-        for (var attr in d) {
-          if (attr !== 'name') {
-            if (schema.entityTypes.group.attributes[attr]) {
-              c[groupName][attr] = d[attr]
-            }
-          }
-        }
-        return c
-      }
-
-      var schema;
-      var treeData;
+      // connect to the router using the address that served this web page. then get the router schema and policy tree
       var host = $location.host()
       var port = $location.port()
       var connectOptions = {address: host, port: port, reconnect: true, properties: {client_id: 'policy GUI'}}
       QDRService.management.connection.addConnectAction( function () {
         QDR.log.info("connected to dispatch network on " + host + ":" + port)
 
+        // ask management to get the schema
         QDRService.management.getSchema(function () {
+          // once schema is available, save it
           schema = QDRService.management.schema()
-          delete schema.entityTypes.policy.attributes.policyDir
-          schema.entityTypes['group'] = {
-            attributes: {
-              name: {
-                'default': '',
-                type: 'string',
-                description: 'The name for this group'
-              },
-              users: {
-                'default': "",
-                type: 'string',
-                description: 'Comma separated list of authenticated users in this group.'
-              },
-              remoteHosts: {
-                'default': "",
-                type: 'string',
-                description: 'List of remote hosts from which the users may connect. List values may be host names, numeric IP addresses, numeric IP address ranges, or the wildcard *. An empty list denies all access.'
-              },
-              maxFrameSize: {
-                'default': "2^31-1",
-                type: 'integer',
-                description: 'Largest frame that may be sent on this connection. (AMQP Open, max-frame-size)'
-              },
-              maxSessions: {
-                'default': 65535,
-                type: 'integer',
-                description: 'Maximum number of sessions that may be created on this connection. (AMQP Open, channel-max)'
-              },
-              maxSessionWindow: {
-                'default': '2^31-1',
-                type: 'integer',
-                description: 'Incoming capacity for new sessions. (AMQP Begin, incoming-window)'
-              },
-              maxMessageSize: {
-                'default': '0 (no limit)',
-                type: 'integer',
-                description: 'Largest message size supported by links created on this connection. If this field is zero there is no maximum size imposed by the link endpoint. (AMQP Attach, max-message-size)'
-              },
-              maxSenders: {
-                'default': '2^31-1',
-                type: 'integer',
-                description: 'Maximum number of sending links that may be created on this connection.'
-              },
-              maxReceivers: {
-                'default': '2^31-1',
-                type: 'integer',
-                description: 'Maximum number of receiving links that may be created on this connection.'
-              },
-              allowDynamicSource: {
-                'default': false,
-                type: 'boolean',
-                description: 'This connection is allowed to create receiving links using the Dynamic Link Source feature.'
-              },
-              allowAnonymousSender: {
-                'default': false,
-                type: 'boolean',
-                description: 'This connection is allowed to create sending links using the Anonymous Sender feature.'
-              },
-              allowUserIdProxy: {
-                'default': false,
-                type: 'boolean',
-                description: 'This connection is allowed to send messages with a user_id property that differs from the connection’s authenticated user id.'
-              },
-              sources: {
-                'default': '',
-                type: 'string',
-                description: 'List of Source addresses allowed when creating receiving links. This list may be expressed as a CSV string or as a list of strings. An empty list denies all access.'
-              },
-              targets: {
-                'default': '',
-                type: 'string',
-                description: 'List of Target addresses allowed when creating sending links. This list may be expressed as a CSV string or as a list of strings. An empty list denies all access.'
-              }
-            }
-          }
+          // add group attributes to the schema
+          add_group_schema(schema)
           console.log("got schema")
-          QDRService.policy.connection.addConnectAction( function () {
-            QDRService.policy.connection.send([], undefined, 'GET-POLICY')
-              .then( function (success) {
-                console.log("got initial policy tree")
-                treeModel = Adapter.treeFromDB(success.response, schema)
-                treeData = treeModel.data
-                $scope.topLevel = treeModel.level
-                if ($scope.topLevel === 'vhost')
-                  $('.legend.policy').css('display', 'none')
-                initTree($scope.topLevel)
-              })
-          })
-          connectOptions.properties = {client_id: 'policy linkRoute'}
-          connectOptions.sender_address = address
-          QDRService.policy.connection.connect(connectOptions)
+          // get policy from service
+          Policy.get_policy(connectOptions)
+            .then( function (response) {
+              console.log("got initial policy tree")
+              // convert policy data from service to tree needed for this page
+              var treeModel = Adapter.treeFromDB(response, schema)
+              treeData = treeModel.data
+              $scope.topLevel = treeModel.level
+              // don't show the policy part of the tree if we are only working on a vhost
+              if ($scope.topLevel === 'vhost')
+                $('.legend.policy').css('display', 'none')
+              // draw the tree
+              initTree($scope.topLevel, treeData)
+            }, function (error) {
+              Core.notification('error', error.msg)
+            })
         })
-
       })
-      // connect to the router using the host:port of this web page
+      // connect to router. this triggers the above addConnectAction handler once connected
       QDRService.management.connection.connect(connectOptions)
 
       $scope.formMode = 'edit'
       $scope.showForm = 'policy'
 
-/*
-      policy = {
-          <global settings>
-      }
-
-      vhost = {
-          id: vhost-name
-          <connection limits>
-          groups: {
-              group-name: {
-                  <user group settings>
-              }
-          }
-      }
-*/
+      // called when edit form is submitted
       var updatePolicy = function (oldName, d) {
         var DBModel = Adapter.DBFromTree(treeData, schema)
         DBModel.update = {oldKey: oldName, newKey: d.name, type: d.type, parentKey: (d.type !== 'policy' ? d.parent.name : null)}
-        QDRService.policy.connection.send(DBModel, address, "SAVE-POLICY")
-          .then( function (success_response) {
-            console.log(success_response.response)
-            Core.notification("success", "updated policy")
-          }, function (error_response) {
-            Core.notification("error", "update policy failed")
-          })
+        Policy.sendPolicyRequest(DBModel, "SAVE-POLICY", true)
       }
 
-      $scope.savePolicy = function () {
+      // called when add form is submitted
+      var savePolicy = function () {
         var DBModel = Adapter.DBFromTree(treeData, schema)
-        QDRService.policy.connection.send(DBModel, address, "SAVE-POLICY")
-          .then( function (success_response) {
-            console.log(success_response.response)
-            Core.notification("success", "saved policy")
-          }, function (error_response) {
-            Core.notification("error", "save policy failed")
-          })
+        Policy.sendPolicyRequest(DBModel, "SAVE-POLICY", true)
       }
 
-      var initTree = function (level) {
+      // create the tree svg diagram
+      var initTree = function (level, root) {
         // association of classes with shapes
         var classesMap = {
             add: "cross",
-            policy: "circle",
+            policy: "diamond",
             vhost: "square",
-            group: "diamond"
+            group: "circle"
         }
 
+        var calc_height = function () {
+          return Math.max(Adapter.group_count(root) * 30 + Adapter.vhost_count(root) * 10, 500)
+        }
+        var desired_width = 600
+        var desired_height = calc_height()
         var tmargin = {top: 20, right: 120, bottom: 20, left: 80},
-          twidth = 600 - tmargin.right - tmargin.left,
-          theight = 500 - tmargin.top - tmargin.bottom;
+          twidth = desired_width - tmargin.right - tmargin.left,
+          theight = desired_height - tmargin.top - tmargin.bottom;
 
         var ti = 0,
-          duration = 750,
-          root;
+          duration = 750
 
         var tree = d3.layout.tree()
           .size([theight, twidth]);
@@ -325,10 +119,20 @@ var QDR = (function(QDR) {
           .append("g")
           .attr("transform", "translate(" + tmargin.left + "," + tmargin.top + ")");
 
-        root = treeData;
         root.x0 = theight / 2;
         root.y0 = 0;
 
+        var resizeTree = function () {
+          desired_height = calc_height()
+          theight = desired_height - tmargin.top - tmargin.bottom
+
+          d3.select('#topology svg')
+            .attr('height', theight + tmargin.top + tmargin.bottom)
+          tree.size([theight, twidth])
+        }
+
+        // draw the svg using this data
+        //resizeTree()
         update(root);
         d3.select('g.'+level).classed('selected', true)
         $timeout( function () {
@@ -337,8 +141,6 @@ var QDR = (function(QDR) {
           $scope.shadowData = angular.copy(root)
           $('.all-forms :input:visible:enabled:first').focus()
         })
-
-        d3.select(self.frameElement).style("height", "500px");
 
         function update(source) {
 
@@ -361,13 +163,9 @@ var QDR = (function(QDR) {
 
           // use a shape for a node depending on its class
           nodeEnter.append("path")
-            //.style("stroke", "black")
-            //.style("fill", "white")
             .attr("d", d3.svg.symbol()
-                 .size(200)
+                 .size(150)
                  .type(function(d) {
-                    //if (d.add)
-                    //  return classesMap['add']
                     return classesMap[d.type]
                   }))
 
@@ -385,8 +183,6 @@ var QDR = (function(QDR) {
               }
             return "Click to edit this " + d.type
             })
-
-          //d3.selectAll()
 
           // Transition nodes to their new position.
           var nodeUpdate = tnode.transition()
@@ -428,7 +224,7 @@ var QDR = (function(QDR) {
             .duration(duration)
             .attr("d", diagonal);
 
-          // Transition exiting nodes to the parent's new position.
+          // Transition exiting links to the parent's new position.
           tlink.exit().transition()
             .duration(duration)
             .attr("d", function(d) {
@@ -439,8 +235,8 @@ var QDR = (function(QDR) {
 
           // Stash the old positions for transition.
           tnodes.forEach(function(d) {
-          d.x0 = d.x;
-          d.y0 = d.y;
+            d.x0 = d.x;
+            d.y0 = d.y;
           });
         }
 
@@ -574,17 +370,17 @@ var QDR = (function(QDR) {
             req.vhost = $scope.formData.parent.name
             req.group = $scope.formData['name']
           }
-          QDRService.policy.connection.send(req, address, "DELETE")
-            .then( function (success_response) {
-              console.log(success_response.response)
-              if (success_response.response != "OK") {
-                Core.notification("error", "delete failed: " + success_response.response)
+          Policy.sendPolicyRequest(req, "DELETE", false)
+            .then( function (response) {
+              if (response != "OK") {
+                Core.notification("error", "delete failed: " + response)
               } else
                 Core.notification("success", $scope.showForm + " deleted")
                 // find this tree node in the parent's children list
                 for (var i=0; i<d.parent.children.length; i++) {
                   if (d.name === d.parent.children[i].name) {
                     d.parent.children.splice(i, 1)
+                    resizeTree()
                     update(d.parent)
                     $timeout( function () {
                       var node = d3.selectAll('.node.'+d.parent.type).filter(function(g){return d.parent.name === g.name}).node();
@@ -593,10 +389,7 @@ var QDR = (function(QDR) {
                     break;
                   }
                 }
-            }, function (error_response) {
-              Core.notification("error", "delete failed")
             })
-
         }
 
         $scope.formEditOK = function (d, form) {
@@ -613,10 +406,7 @@ var QDR = (function(QDR) {
               if (dt.name === d.name)
                 d3.select(this).text(d.name);
             });
-            if (oldName !== d.name) {
-              updatePolicy(oldName, d)
-            } else
-              $scope.savePolicy()
+            updatePolicy(oldName, d)
           })
         }
         $scope.formAddOK = function (d) {
@@ -641,7 +431,7 @@ var QDR = (function(QDR) {
             d.parent.children.splice(d.parent.children.length-1, 0, n)
 
             update(d.parent)
-            $scope.savePolicy()
+            savePolicy()
           })
         }
 
@@ -673,13 +463,14 @@ var QDR = (function(QDR) {
           $scope.defaultGroup = (newVal === '$default')
         })
       }
-
     }
   ]);
 
   return QDR;
 }(QDR || {}));
 
+  // Custom form validator to prevent sibling vhosts and groups from having the same name
+  // This is used by the html form on an input element like so: <input duplicate-sibling-name ... />
   QDR.module.directive('duplicateSiblingName', [function () {
     return {
       restrict: 'A',
@@ -707,6 +498,8 @@ var QDR = (function(QDR) {
     }
   }])
 
+  // Custom form validator to prevent sibling groups from containing duplicate user names
+  // <input duplicate-user .... />
   QDR.module.directive('duplicateUser', [function () {
     return {
       restrict: 'A',
