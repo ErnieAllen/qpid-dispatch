@@ -158,14 +158,17 @@ class DB(object):
         values = self.vals(cols, obj)
         names = ','.join(cols)
 
-        if set_fields is not None:
-            for field in set_fields:
-                idx = cols.index(field['field_name'])
-                values[idx] = field['field_value']
-
         # there must be a unique index so this will
         # update if index value exists, otherwise insert
         s = "REPLACE INTO %s (%s) VALUES (%s);" % (table, names, ','.join(['?'] * len(values)))
+        self.execute(s, values)
+
+    def update_record(self, obj, table, keyName, keyValue):
+        cols = self.getTableCols(table, filter=True)
+        values = self.vals(cols, obj)
+        values.append(keyValue)
+        names = ', '.join(['%s=?' % x for x in cols])
+        s = 'UPDATE %s SET %s WHERE %s = ?' % (table, names, keyName)
         self.execute(s, values)
 
     def lookupVhostId(self, id):
@@ -174,7 +177,27 @@ class DB(object):
             return vrow[0][0]
         return -1
 
+        #DBModel.update = {oldKey: oldName, newKey: d.name, type: d.type, parentKey: (d.type !== 'policy' ? d.parent.name : null)}
+
     def update(self, policyvhosts, vhost):
+        # update just one record
+        keys = policyvhosts.get('update', None)
+        if keys:
+            if keys['type'] == 'policy':
+                self.update_record(policyvhosts['policy'], 'policy', '_policy_id', 1)
+            elif keys['type'] == 'vhost':
+                vhost = next((item for item in policyvhosts['vhosts'] if item['id'] == keys['newKey']), None)
+                if vhost:
+                    self.update_record(vhost, 'vhosts', 'id', keys['oldKey'])
+            else:
+                vhost = next((item for item in policyvhosts['vhosts'] if item['id'] == keys['parentKey']), None)
+                if vhost:
+                    group = vhost['groups'][keys['newKey']]
+                    group['name'] = keys['newKey']
+                    self.update_record(group, 'groups', 'name', keys['oldKey'])
+            return
+
+        # update the policy record
         if vhost is None:
             policy = policyvhosts['policy']
             cols = self.getTableCols('policy', True)
@@ -183,6 +206,7 @@ class DB(object):
             s = 'UPDATE policy SET %s WHERE _policy_id = 1' % names
             self.execute(s, values)
 
+        # update the vhost and group records
         vhosts = policyvhosts['vhosts']
         for vhost in vhosts:
             self.replace_record(vhost, 'vhosts')
@@ -191,10 +215,9 @@ class DB(object):
             if _vhost_id > -1:
                 groups = vhost.get('groups', {})
                 for group in groups:
-                    self.replace_record(groups[group], 'groups', False, [{'field_name': '_vhost_id',
-                                                                          'field_value': _vhost_id},
-                                                                         {'field_name': 'name',
-                                                                          'field_value': group}])
+                    groups[group]['_vhost_id'] = _vhost_id
+                    groups[group]['name'] = group
+                    self.replace_record(groups[group], 'groups', False)
 
     def getVhosts(self, id=None):
         vhostlist = []

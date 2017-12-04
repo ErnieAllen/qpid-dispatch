@@ -273,6 +273,18 @@ var QDR = (function(QDR) {
           }
       }
 */
+      var updatePolicy = function (oldName, d) {
+        var DBModel = Adapter.DBFromTree(treeData, schema)
+        DBModel.update = {oldKey: oldName, newKey: d.name, type: d.type, parentKey: (d.type !== 'policy' ? d.parent.name : null)}
+        QDRService.policy.connection.send(DBModel, address, "SAVE-POLICY")
+          .then( function (success_response) {
+            console.log(success_response.response)
+            Core.notification("success", "updated policy")
+          }, function (error_response) {
+            Core.notification("error", "update policy failed")
+          })
+      }
+
       $scope.savePolicy = function () {
         var DBModel = Adapter.DBFromTree(treeData, schema)
         QDRService.policy.connection.send(DBModel, address, "SAVE-POLICY")
@@ -595,13 +607,16 @@ var QDR = (function(QDR) {
             return $scope.formAddOK(d)
 
           $timeout( function () {
+            var oldName = $scope.shadowData.name
             revert($scope.shadowData, d)
-            //$scope.formMode = 'view'
             d3.selectAll("g." + d.type + " text").each(function(dt) {
               if (dt.name === d.name)
                 d3.select(this).text(d.name);
             });
-            $scope.savePolicy()
+            if (oldName !== d.name) {
+              updatePolicy(oldName, d)
+            } else
+              $scope.savePolicy()
           })
         }
         $scope.formAddOK = function (d) {

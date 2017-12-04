@@ -48,7 +48,7 @@ class Operations(object):
     def SAVE_POLICY(self, request, vhost):
         with DB(verbose=self.verbose) as db:
             db.update(request, vhost)
-        return u"policy saved"
+        return u'policy saved'
 
     def DELETE(self, request, vhost):
         if vhost is not None:
