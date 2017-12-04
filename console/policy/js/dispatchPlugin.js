@@ -26,46 +26,12 @@ under the License.
 var QDR = (function(QDR) {
 
   /**
-   * @property pluginName
-   * @type {string}
-   *
-   * The name of this plugin
-   */
-  QDR.pluginName = "QDR";
-  QDR.pluginRoot = "";
-
-  /**
-   * @property log
-   * @type {Logging.Logger}
-   *
-   * This plugin's logger instance
-   */
-  //HIO QDR.log = Logger.get(QDR.pluginName);
-  /**
-   * @property templatePath
-   * @type {string}
-   *
-   * The top level path to this plugin's partials
-   */
-  QDR.srcBase = "";
-  QDR.templatePath = QDR.srcBase + "html/";
-  QDR.cssPath = QDR.srcBase + "css/";
-  /**
-   * @property SETTINGS_KEY
-   * @type {string}
-   *
-   * The key used to fetch our settings from local storage
-   */
-  QDR.SETTINGS_KEY = 'QDRSettings';
-  QDR.LAST_LOCATION = "QDRLastLocation";
-
-  /**
    * @property module
    * @type {object}
    *
-   * This plugin's angularjs module instance
+   * The angularjs module instance
    */
-  QDR.module = angular.module(QDR.pluginName, ['ngAnimate', 'ngResource', 'ngSanitize', 'ngMessages', 'ui.bootstrap']);
+  QDR.module = angular.module("QDR.policy", ['ngAnimate', 'ngResource', 'ngSanitize', 'ngMessages', 'ui.bootstrap']);
 
   Core = {
     notification: function (severity, msg) {
@@ -73,32 +39,6 @@ var QDR = (function(QDR) {
       console.log(severity + ": " + msg)
     }
   }
-
-  // modified from http://benjii.me/2014/07/angular-directive-for-bootstrap-switch/
-  // allows ng-model tracking for jquery bootstrap-switch
-  QDR.module.directive('bootstrapSwitch', [
-   function() {
-     return {
-       restrict: 'A',
-       require: '?ngModel',
-       link: function(scope, element, attrs, ngModel) {
-         element.bootstrapSwitch('size', 'small');
-
-         element.on('switchChange.bootstrapSwitch', function(event, state) {
-           if (ngModel) {
-             scope.$apply(function() {
-               ngModel.$setViewValue(state);
-             });
-           }
-         });
-
-         scope.$watch(attrs.ngModel, function(newValue, oldValue) {
-           element.bootstrapSwitch('state', newValue || false, true);
-         });
-       }
-     };
-   }
- ]);
 
   QDR.module.config(function ($compileProvider) {
     $compileProvider.aHrefSanitizationWhitelist(/^\s*(https?|ftp|mailto|chrome-extension|file|blob):/);
@@ -126,19 +66,19 @@ var QDR = (function(QDR) {
     }
   })
 
-    QDR.module.filter('safePlural', function () {
-          return function (str) {
-        var es = ['x', 'ch', 'ss', 'sh']
-        for (var i=0; i<es.length; ++i) {
-          if (str.endsWith(es[i]))
-            return str + 'es'
-        }
-        if (str.endsWith('y'))
-          return str.substr(0, str.length-2) + 'ies'
-        if (str.endsWith('s'))
-          return str;
-        return str + 's'
-          }
+  QDR.module.filter('safePlural', function () {
+      return function (str) {
+    var es = ['x', 'ch', 'ss', 'sh']
+    for (var i=0; i<es.length; ++i) {
+      if (str.endsWith(es[i]))
+        return str + 'es'
+    }
+    if (str.endsWith('y'))
+      return str.substr(0, str.length-2) + 'ies'
+    if (str.endsWith('s'))
+      return str;
+    return str + 's'
+      }
   })
 
   QDR.logger = function ($log) {
@@ -155,33 +95,10 @@ var QDR = (function(QDR) {
     // of our module
   QDR.module.run( ["$log", function ($log) {
     QDR.log = new QDR.logger($log);
-    QDR.log.info("*************creating config editor************");
+    QDR.log.info("************* creating policy editor ************");
 
-  }]);
-
-  QDR.module.config(['$qProvider', function ($qProvider) {
-      $qProvider.errorOnUnhandledRejections(false);
   }]);
 
   return QDR;
 }(QDR || {}));
 
-var Folder = (function () {
-    function Folder(title) {
-        this.title = title;
-    this.children = [];
-    this.folder = true;
-    }
-    return Folder;
-})();
-var Leaf = (function () {
-    function Leaf(title) {
-        this.title = title;
-    }
-    return Leaf;
-})();
-
-// split while collapsing multiple white space characters into one (the way python does it)
-String.prototype.python_split = function (s) {
-  return this.split(/(\s+)/).filter( function(e) { return e.trim().length > 0; } );
-}

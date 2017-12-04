@@ -39,38 +39,9 @@ under the License.
     <link rel="stylesheet" href="css/dispatch.css" type="text/css"/>
     <link rel="stylesheet" href="css/policy.css" type="text/css"/>
 
-    <style>
-
-	.node {
-		cursor: pointer;
-	}
-
-    .node polygon {
-        fill: #fff;
-        stroke: steelblue;
-        stroke-width: 1px;
-    }
-
-	.node circle {
-	  fill: #fff;
-	  stroke: steelblue;
-	  stroke-width: 3px;
-	}
-
-	.node text {
-	  font: 12px sans-serif;
-	}
-
-	.link {
-	  fill: none;
-	  stroke: #ccc;
-	  stroke-width: 2px;
-	}
-
-    </style>
 </head>
 
-<body ng-app="QDR">
+<body ng-app="QDR.policy">
 
     <nav class="navbar navbar-default navbar-pf" role="navigation">
         <div class="navbar-header">
@@ -110,6 +81,7 @@ under the License.
 <script src='node_modules/d3/d3.js'></script>
 <script src="node_modules/notifyjs-browser/dist/notify.js"></script>
 
+<script type="text/javascript" src="js/pollyfill.js"></script>
 <script type="text/javascript" src="js/dispatchPlugin.js"></script>
 <script type="text/javascript" src="js/qdrService.js"></script>
 <script type="text/javascript" src="js/adapter_wrapper.js"></script>

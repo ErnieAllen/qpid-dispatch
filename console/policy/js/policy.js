@@ -26,8 +26,8 @@ var QDR = (function(QDR) {
    *
    * Controller that handles the QDR topology page
    */
-  QDR.module.controller("QDR.TopologyController", ['$scope', '$rootScope', 'QDRService', '$location', '$timeout', '$uibModal',
-    function($scope, $rootScope, QDRService, $location, $timeout, $uibModal) {
+  QDR.module.controller("QDR.PolicyController", ['$scope', 'QDRService', '$location', '$timeout',
+    function($scope, QDRService, $location, $timeout) {
 
       var Adapter = Adapter_wrapper()                     // converts between the database model and the tree model
       var Policy = Policy_wrapper(QDRService, $location)  // sends requests to policy service
@@ -89,8 +89,7 @@ var QDR = (function(QDR) {
       var initTree = function (level, root) {
         // association of classes with shapes
         var classesMap = {
-            add: "cross",
-            policy: "diamond",
+            policy: "cross",
             vhost: "square",
             group: "circle"
         }
@@ -132,7 +131,6 @@ var QDR = (function(QDR) {
         }
 
         // draw the svg using this data
-        //resizeTree()
         update(root);
         d3.select('g.'+level).classed('selected', true)
         $timeout( function () {
@@ -294,7 +292,9 @@ var QDR = (function(QDR) {
             // set selected on this node
             d3.select(this).classed("selected", true)
             showForm(d)
-            $('.all-forms :input:visible:enabled:first').focus()
+            $timeout(function () {
+              $('.all-forms :input:visible:enabled:first').focus()
+            })
           }).bind(this))
           //$scope.validateName(d.type)
           return;
@@ -430,6 +430,7 @@ var QDR = (function(QDR) {
             // add the new node in the 2nd to last position to preserve the Add node at the end
             d.parent.children.splice(d.parent.children.length-1, 0, n)
 
+            resizeTree()
             update(d.parent)
             savePolicy()
           })
@@ -563,3 +564,31 @@ var QDR = (function(QDR) {
       }
     }
   }])
+
+  // modified from http://benjii.me/2014/07/angular-directive-for-bootstrap-switch/
+  // allows ng-model tracking for jquery bootstrap-switch
+  QDR.module.directive('bootstrapSwitch', [
+   function() {
+     return {
+       restrict: 'A',
+       require: '?ngModel',
+       link: function(scope, element, attrs, ngModel) {
+         element.bootstrapSwitch('size', 'small');
+
+         element.on('switchChange.bootstrapSwitch', function(event, state) {
+           if (ngModel) {
+             scope.$apply(function() {
+               ngModel.$setViewValue(state);
+             });
+           }
+         });
+
+         scope.$watch(attrs.ngModel, function(newValue, oldValue) {
+           element.bootstrapSwitch('state', newValue || false, true);
+         });
+       }
+     };
+   }
+ ]);
+
+
