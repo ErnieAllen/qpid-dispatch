@@ -29,14 +29,15 @@ var QDR = (function(QDR) {
   QDR.module.controller("QDR.PolicyController", ['$scope', 'QDRService', '$location', '$timeout',
     function($scope, QDRService, $location, $timeout) {
 
-      var Adapter = Adapter_wrapper()                     // converts between the database model and the tree model
+      var host = $location.host()
+      var port = $location.port()
+
+      var Adapter = Adapter_wrapper(host)                 // converts between the database model and the tree model
       var Policy = Policy_wrapper(QDRService, $location)  // sends requests to policy service
       var schema;   // router schema used to validate form entries and filter out UI decoration of the tree data
       var treeData; // working copy of the data needed to draw the tree
 
       // connect to the router using the address that served this web page. then get the router schema and policy tree
-      var host = $location.host()
-      var port = $location.port()
       var connectOptions = {address: host, port: port, reconnect: true, properties: {client_id: 'policy GUI'}}
       QDRService.management.connection.addConnectAction( function () {
         QDR.log.info("connected to dispatch network on " + host + ":" + port)
@@ -89,7 +90,7 @@ var QDR = (function(QDR) {
       var initTree = function (level, root) {
         // association of classes with shapes
         var classesMap = {
-            policy: "cross",
+            policy: "diamond",
             vhost: "square",
             group: "circle"
         }
@@ -99,7 +100,7 @@ var QDR = (function(QDR) {
         }
         var desired_width = 600
         var desired_height = calc_height()
-        var tmargin = {top: 20, right: 120, bottom: 20, left: 80},
+        var tmargin = {top: 20, right: 120, bottom: 20, left: 120},
           twidth = desired_width - tmargin.right - tmargin.left,
           theight = desired_height - tmargin.top - tmargin.bottom;
 

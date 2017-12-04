@@ -61,8 +61,9 @@ under the License.
 */
 
 // convert between the database model and the tree model
-var Adapter_wrapper = function () {
+var Adapter_wrapper = function (host) {
   var adapter = {}
+  var host = host
 
   var Group = function (d, name, parent) {
     c = angular.copy(d)
@@ -142,6 +143,9 @@ var Adapter_wrapper = function () {
     // no policy, use 1st (and only) vhost as tree root
     if (policy.empty) {
       treeModel.level = 'vhost'
+      if (vhosts.length == 0) {
+        vhosts = [{id: host, groups: {}}]
+      }
       treeModel.data = new VHost(vhosts[0], schema)
     } else {
       policy.name = 'Policy'
