@@ -28,6 +28,7 @@ from proton.handlers import MessagingHandler
 from proton.reactor import Container
 
 from db import DB
+import pdb
 
 class Operations(object):
     def __init__(self, verbose):
@@ -90,6 +91,10 @@ class Server(MessagingHandler):
         if event.link.remote_target.address:
             if self.verbose:
                 print("opening remote link", event.link.remote_target.address)
+
+    def on_connection_opened(self, event):
+        if self.verbose:
+            print ('connection opened')
 
     def on_message(self, event):
         if self.verbose:
