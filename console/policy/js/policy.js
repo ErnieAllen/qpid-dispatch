@@ -279,6 +279,12 @@ var QDR = (function(QDR) {
             warnPlaceholder('targets', newVal)
           }
         })
+        var clickon = function (d) {
+          var node = d3.selectAll('.node.'+d.type).filter(function(g) {
+              return d.name === g.name && (d.parent ? (d.parent.name === g.parent.name) : true)
+            }).node();
+          click.call(node, d)
+        }
         function click(d) {
           var selected = d3.select(this).classed("selected")
           // clicked on the current node
@@ -363,6 +369,7 @@ var QDR = (function(QDR) {
               d[dattr] = d[dattr].trim()
           }
         }
+        // the delete button was clicked
         $scope.formDelete = function (d) {
           var req = {type: $scope.showForm}
           if ($scope.showForm === 'vhost')
@@ -376,7 +383,7 @@ var QDR = (function(QDR) {
               if (response != "OK") {
                 Core.notification("error", "delete failed: " + response)
               } else
-                Core.notification("success", $scope.showForm + " deleted")
+                Core.notification("success", $scope.showForm + " " + d.name + " deleted")
                 // find this tree node in the parent's children list
                 for (var i=0; i<d.parent.children.length; i++) {
                   if (d.name === d.parent.children[i].name) {
@@ -384,15 +391,14 @@ var QDR = (function(QDR) {
                     resizeTree()
                     update(d.parent)
                     $timeout( function () {
-                      var node = d3.selectAll('.node.'+d.parent.type).filter(function(g){return d.parent.name === g.name}).node();
-                      click.call(node, d.parent)
+                      clickon(d.parent)
                     })
                     break;
                   }
                 }
             })
         }
-
+        // the edit form was submitted
         $scope.formEditOK = function (d, form) {
           trimAll(d)
           form.$setPristine()
@@ -413,6 +419,7 @@ var QDR = (function(QDR) {
               savePolicy()
           })
         }
+        // the edit form was submitted on a new entity
         $scope.formAddOK = function (d) {
           $timeout( function () {
             // copy the form's values to a new node
@@ -434,8 +441,15 @@ var QDR = (function(QDR) {
             // add the new node in the 2nd to last position to preserve the Add node at the end
             d.parent.children.splice(d.parent.children.length-1, 0, n)
 
+            // resise and redraw the tree
             resizeTree()
             update(d.parent)
+
+            // highlight the add child of the newly added node
+            if (n.children && n.children.length == 1) {
+              clickon(n.children[0])
+            }
+            // save the data
             savePolicy()
           })
         }
