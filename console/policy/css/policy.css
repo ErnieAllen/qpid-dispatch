@@ -161,6 +161,17 @@ svg .add text {
   color: white;
   font-weight: bold;
   border-top: 1px solid white;
+  position: fixed;
+  top: 22px;
+  z-index: 200;
+}
+
+.navbar-header {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  background-color: black;
+  z-index: 200;
 }
 
 div.legend {
@@ -232,11 +243,12 @@ g.node.hovered path, g.node.selected path {
   stroke-width: 4px;
 }
 #topology {
-  position: absolute;
+  position: fixed;
 }
 
 .policy-container {
-  /* position: relative; */
+  position: relative;
+  top: 3em;
 }
 
 form.view-only input {
@@ -255,7 +267,9 @@ small.ng-active
 }
 
 
-
+.form-control {
+  padding-right: 0;
+}
 
 .view-none {
   border: 1px solid #dddddd;
@@ -267,7 +281,7 @@ small.ng-active
 }
 
 .form-group small div {
-  max-width: 40em;
+  max-width: 45em;
 }
 
 .form-group h3 {
@@ -290,7 +304,7 @@ span.form-dirty {
   z-index: 100;
   position: absolute;
   margin-left: 50em;
-  width: 42em;
+  width: 45em;
   padding: 2em;
 }
 
@@ -364,3 +378,7 @@ input.duplicate::-ms-input-placeholder
     stroke: #ccc;
     stroke-width: 2px;
   }
+
+.form-group.disabled {
+    display: none;
+}
