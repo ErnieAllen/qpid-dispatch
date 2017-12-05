@@ -96,7 +96,7 @@ var QDR = (function(QDR) {
         }
 
         var calc_height = function () {
-          return Math.max(Adapter.group_count(root) * 30 + Adapter.vhost_count(root) * 10, 500)
+          return Math.max(Adapter.group_count(root) * 30 + Adapter.vhost_count(root) * 10, 360)
         }
         var desired_width = 600
         var desired_height = calc_height()
@@ -407,7 +407,10 @@ var QDR = (function(QDR) {
               if (dt.name === d.name)
                 d3.select(this).text(d.name);
             });
-            updatePolicy(oldName, d)
+            if (oldName !== d.name) {
+              updatePolicy(oldName, d)
+            } else
+              savePolicy()
           })
         }
         $scope.formAddOK = function (d) {

@@ -32,7 +32,7 @@ class DB(object):
                     'id': 'TEXT NOT NULL',
                     'maxConnections': 'INTEGER',
                     'maxConnectionsPerUser': 'INTEGER',
-                    'maxConnectionPerRemoteHost': 'INTEGER',
+                    'maxConnectionsPerHost': 'INTEGER',
                     'allowUnknownUser': 'INTEGER'},
         'groups':  {'name': 'TEXT NOT NULL',
                     'users': 'TEXT',
