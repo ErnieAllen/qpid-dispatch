@@ -25,13 +25,6 @@ var Policy_wrapper = function (QDRService, $location) {
     var policy = {}           // public. any properties put on this variable will be exposed
     var address = '/policy'   // private
 
-    console.log('location.url is ' + $location.url())
-    var tenant = $location.url().split('=')
-    if (tenant && tenant.length > 1) {
-      address = '/' + tenant[1] + '/policy'
-    }
-    console.log('setting address to '+ address)
-
     // connect to the policy server and request the policy for the current address (vhost or root policy)
     policy.get_policy = function (connectOptions) {
       var p = new Promise( function (resolve, reject) {
@@ -45,6 +38,7 @@ var Policy_wrapper = function (QDRService, $location) {
         })
         connectOptions.properties = {client_id: 'policy linkRoute'}
         connectOptions.sender_address = address
+        connectOptions.hostname = $location.host()  // allow multi-tenancy
         QDRService.policy.connection.connect(connectOptions)
       })
       return p
