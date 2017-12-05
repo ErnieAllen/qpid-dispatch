@@ -61,16 +61,16 @@ under the License.
                     <h2 ng-show="formMode === 'edit'">{{currentForm.$dirty ? "Editing " : ""}}Vhost {{shadowData.name}}</h2>
                     <h2 ng-show="formMode === 'add'">Adding new vhost</h2>
                     <form name="editvhost" ng-submit="formEditOK(formData, editvhost)">
-                        <div class="form-group">
+                        <div class="form-group" ng-class="{'disabled': topLevel === 'vhost'}">
                             <label for="vhostname">Vhost ID</label>
                             <input
                                     name="vhostname"
                                     type="text"
                                     class="form-control"
-                                    ng-class="{'duplicate': formData.duplicate}"
                                     id="vhostname"
                                     aria-describedby="vhostnamehelp"
                                     placeholder="Enter vhost name"
+                                    ng-class="{'duplicate': formData.duplicate}"
                                     ng-required="true"
                                     ng-model="formData.name"
                                     duplicate-sibling-name
@@ -92,8 +92,8 @@ under the License.
                             <input name="maxConnectionsPerUser" type="number" class="form-control" id="maxConnectionsPerUser" placeholder="Defaults to 65535" ng-model="formData.maxConnectionsPerUser">
                         </div>
                         <div class="form-group">
-                            <label for="maxConnectionsPerRemoteHost">maxConnectionsPerRemoteHost</label>
-                            <input name="maxConnectionsPerRemoteHost" type="number" class="form-control" id="maxConnectionsPerRemoteHost" placeholder="Defaults to 65535" ng-model="formData.maxConnectionsPerRemoteHost">
+                            <label for="maxConnectionsPerHost">maxConnectionsPerHost</label>
+                            <input name="maxConnectionsPerHost" type="number" class="form-control" id="maxConnectionsPerHost" placeholder="Defaults to 65535" ng-model="formData.maxConnectionsPerHost">
                         </div>
                         <div class="form-check">
                             <label class="form-check-label">
