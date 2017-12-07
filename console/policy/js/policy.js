@@ -37,38 +37,40 @@ var QDR = (function(QDR) {
       var schema;   // router schema used to validate form entries and filter out UI decoration of the tree data
       var treeData; // working copy of the data needed to draw the tree
 
+
       // connect to the router using the address that served this web page. then get the router schema and policy tree
       var connectOptions = {address: host, port: port, reconnect: true, properties: {client_id: 'policy GUI'}}
-      QDRService.management.connection.addConnectAction( function () {
-        QDR.log.info("connected to dispatch network on " + host + ":" + port)
-
-        // ask management to get the schema
-        QDRService.management.getSchema(function () {
-          // once schema is available, save it
-          schema = QDRService.management.schema()
-          // add group attributes to the schema
-          add_group_schema(schema)
-          console.log("got schema")
-          // get policy from service
-          Policy.get_policy(connectOptions)
-            .then( function (response) {
-              console.log("got initial policy tree")
-              // convert policy data from service to tree needed for this page
-              var treeModel = Adapter.treeFromDB(response, schema)
-              treeData = treeModel.data
-              $scope.topLevel = treeModel.level
-              // don't show the policy part of the tree if we are only working on a vhost
-              if ($scope.topLevel === 'vhost')
-                $('.legend.policy').css('display', 'none')
-              // draw the tree
-              initTree($scope.topLevel, treeData)
-            }, function (error) {
-              Core.notification('error', error.msg)
-            })
-        })
-      })
-      // connect to router. this triggers the above addConnectAction handler once connected
       QDRService.management.connection.connect(connectOptions)
+        .then( function (results) {
+          QDR.log.info("connected to dispatch network on " + host + ":" + port)
+          QDRService.manageme.getSchema()
+            .then( function (results) {
+              schema = results
+              add_group_schema(schema)
+              console.log("got schema")
+              Policy.get_policy(connectOptions)
+                .then( function (response) {
+                  console.log("got initial policy tree")
+                  // convert policy data from service to tree needed for this page
+                  var treeModel = Adapter.treeFromDB(response, schema)
+                  treeData = treeModel.data
+                  $scope.topLevel = treeModel.level
+                  // don't show the policy part of the tree if we are only working on a vhost
+                  if ($scope.topLevel === 'vhost')
+                    $('.legend.policy').css('display', 'none')
+                  // draw the tree
+                  initTree($scope.topLevel, treeData)
+                }, function (error) {
+                  console.log('unable to get the policy')
+                  Core.notification('error', error.msg)
+                })
+            }, function (error) {
+              console.log('unable to get schema')
+            })
+
+        }, function (error) {
+          console.log('unable to connect to router')
+        })
 
       $scope.formMode = 'edit'
       $scope.showForm = 'policy'
