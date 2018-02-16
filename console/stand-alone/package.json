@@ -4,6 +4,7 @@
   "description": "Qpid Dispatch Router stand-alone console",
   "main": "index.html",
   "scripts": {
+    "eslint": "eslint -c ../.eslintrc.json plugin/",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -43,5 +44,9 @@
     "jquery.fancytree": "^2.26.0",
     "notifyjs-browser": "^0.4.2",
     "patternfly": "^3.30.0"
+  },
+  "devDependencies": {
+    "eslint": "^4.16.0",
+    "jasmine": "^2.9.0"
   }
 }

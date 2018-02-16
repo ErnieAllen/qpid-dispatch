@@ -1,0 +1,20 @@
+<style>
+.chords path {
+  fill-opacity: .67;
+}
+#circle circle {
+  fill: none;
+  pointer-events: all;
+}
+#circle:hover path.fade {
+  display: none;
+}
+.routers rect {
+  fill: white;
+}
+</style>
+
+<div ng-controller="QDR.ChordController">
+  <div ng-show="noValues"><h2>There is no message traffic</h2></div>
+  <div id="chord"></div>
+</div>
