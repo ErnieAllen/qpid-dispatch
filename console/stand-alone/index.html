@@ -37,6 +37,8 @@ under the License.
     <!-- jquery Styles -->
     <link rel="stylesheet" href="node_modules/jquery.fancytree/dist/skin-bootstrap-n/ui.fancytree.css" type="text/css"/>
 
+    <link rel="stylesheet" href="node_modules/patternfly/node_modules/bootstrap-switch/dist/css/bootstrap2/bootstrap-switch.css" type="text/css"/>
+
     <!-- charting styles -->
     <link rel="stylesheet" href="node_modules/c3/c3.css" type="text/css"/>
 
@@ -67,7 +69,7 @@ under the License.
     <div class="collapse navbar-collapse navbar-collapse-1">
         <ul class="nav navbar-nav navbar-primary" ng-controller="QDR.NavBarController">
             <li ng-repeat="link in breadcrumbs" title="{{link.title}}" ng-show="isValid(link)" ng-class='{active : isActive(link.href), "pull-right" : isRight(link), haschart: hasChart(link)}'>
-                <a ng-href="{{link.href}}{{hash}}" ng-bind-html="link.name"></a>
+                <a ng-href="{{link.href}}{{hash}}" ng-bind-html="link.content"></a>
             </li>
         </ul>
     </div>
@@ -113,6 +115,7 @@ under the License.
 <script src="node_modules/angular-ui-grid/ui-grid.js"></script>
 <script src="node_modules/notifyjs-browser/dist/notify.js"></script>
 <script src="node_modules/patternfly/dist/js/patternfly.min.js"></script>
+<script src="node_modules/patternfly/node_modules/bootstrap-switch/dist/js/bootstrap-switch.js"></script>
 
 <script type="text/javascript" src="node_modules/dispatch-management/dist/dispatch-management.js"></script>
 <script type="text/javascript" src="plugin/js/dispatchPlugin.js"></script>
@@ -132,6 +135,7 @@ under the License.
 <script type="text/javascript" src="node_modules/dispatch-console-pages/dist/js/qdrTopology.js"></script>
 <script type="text/javascript" src="node_modules/dispatch-console-pages/dist/js/qdrSettings.js"></script>
 <script type="text/javascript" src="plugin/js/qdrChord.js"></script>
+<script type="text/javascript" src="plugin/js/matrix.js"></script>
 
 <script type="text/javascript">
         //angular.element(document.getElementsByTagName('head')).append(angular.element('<base href="' + window.location.pathname + '" />'));

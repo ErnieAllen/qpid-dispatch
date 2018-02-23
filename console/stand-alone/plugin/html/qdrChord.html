@@ -1,20 +1,72 @@
 <style>
-.chords path {
-  fill-opacity: .67;
-}
-#circle circle {
-  fill: none;
-  pointer-events: all;
-}
-#circle:hover path.fade {
-  display: none;
-}
-.routers rect {
-  fill: white;
-}
-</style>
-
-<div ng-controller="QDR.ChordController">
-  <div ng-show="noValues"><h2>There is no message traffic</h2></div>
-  <div id="chord"></div>
-</div>
+  .chords path {
+    fill-opacity: .67;
+  }
+  #circle circle {
+    fill: none;
+    pointer-events: all;
+  }
+  #circle:hover path.fade {
+    display: none;
+  }
+  .routers rect {
+    fill: white;
+  }
+  
+  #controls {
+    position: absolute;
+    top: 1em;
+    right: 1em;
+    margin: 1em;
+  }
+  #controls #switches {
+    float: left;
+  }
+  #controls #switches span {
+    display: inline-block;
+    padding-right: 1em;
+  }
+  #controls #legend {
+    float: right;
+    padding: 0 1em;
+    border: 1px solid black;
+  }
+  #legend .legend-color {
+    width: 1em;
+    height: 1em;
+    display: inline-block;
+  }
+  #legend .legend-line {
+    margin: 1em;
+  }
+  
+  .bootstrap-switch.bootstrap-switch-small {
+      min-width: 72px;
+  }
+  </style>
+  
+  <div ng-controller="QDR.ChordController">
+    <div ng-show="noValues"><h2>There is no message traffic</h2></div>
+    <div id="chord"></div>
+    <div id="controls">
+      <div id="switches">
+        <span><input bootstrap-switch ng-model="legendOptions.isRate" type="checkbox"/> Rate</span>
+        <span><input bootstrap-switch ng-model="legendOptions.byAddress" type="checkbox"/> By Address</span>
+      </div>
+      <div id="legend">
+        <h4>Routers</h4>
+        <div ng-repeat="(addr, color) in arcColors" class='legend-line'>
+          <span class='legend-color' style='background-color: {{color}};'></span>
+          <span>{{addr}}</span>
+        </div>
+        <div ng-if="legendOptions.byAddress">
+          <h4>Addresses</h4>
+          <div ng-repeat="(addr, color) in chordColors" class='legend-line'>
+            <span class='legend-color' style='background-color: {{color}};'></span>
+            <span>{{addr}}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
