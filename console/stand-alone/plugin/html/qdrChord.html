@@ -6,9 +6,11 @@
     fill: none;
     pointer-events: all;
   }
-  #circle:hover path.fade {
-    display: none;
+  path.fade {
+    opacity: 0.1;
+    /*display: none;*/
   }
+ 
   .routers rect {
     fill: white;
   }
@@ -48,20 +50,20 @@
   <div ng-controller="QDR.ChordController">
     <div ng-show="noValues"><h2>There is no message traffic</h2></div>
     <div id="chord"></div>
-    <div id="controls">
+    <div ng-hide="noValues" id="controls">
       <div id="switches">
         <span><input bootstrap-switch ng-model="legendOptions.isRate" type="checkbox"/> Rate</span>
         <span><input bootstrap-switch ng-model="legendOptions.byAddress" type="checkbox"/> By Address</span>
       </div>
       <div id="legend">
         <h4>Routers</h4>
-        <div ng-repeat="(addr, color) in arcColors" class='legend-line'>
+        <div ng-repeat="(router, color) in arcColors" class='legend-line' ng-mouseover="enterRouter(router)" ng-mouseleave="leaveLegend()">
           <span class='legend-color' style='background-color: {{color}};'></span>
-          <span>{{addr}}</span>
+          <span>{{router}}</span>
         </div>
         <div ng-if="legendOptions.byAddress">
           <h4>Addresses</h4>
-          <div ng-repeat="(addr, color) in chordColors" class='legend-line'>
+          <div ng-repeat="(addr, color) in chordColors" class='legend-line' ng-mouseenter="enterLegend(addr)" ng-mouseleave="leaveLegend()">
             <span class='legend-color' style='background-color: {{color}};'></span>
             <span>{{addr}}</span>
           </div>

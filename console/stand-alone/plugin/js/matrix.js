@@ -50,10 +50,19 @@ valuesMatrix.prototype.zeroInit = function (size) {
     this.addRow();
   }
 };
+// return true of any of the matrix cells have messages
+valuesMatrix.prototype.hasValues = function () {
+  return this.rows.some(function (row) {
+    return row.cols.some(function (col) {
+      return col.messages !== 0;
+    });
+  });
+};
+
 // extract a square matrix with just the values from the object matrix
 valuesMatrix.prototype.matrixMessages = function () {
-  let m = emptyMatrix(valuesMatrix.rows.length);
-  valuesMatrix.rows.forEach( function (row, r) {
+  let m = emptyMatrix(this.rows.length);
+  this.rows.forEach( function (row, r) {
     row.cols.forEach( function (col, c) {
       m[r][c] = col.messages;
     });
