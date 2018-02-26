@@ -109,7 +109,7 @@ var QDR = (function (QDR) {
     // used for animation duration and the data refresh interval 
     let transitionDuration = 1000;
     // format with commas
-    let formatNumber = d3.format(',');
+    let formatNumber = d3.format(',.1f');
 
     // colors
     let colorGen = d3.scale.category10();
@@ -154,7 +154,7 @@ var QDR = (function (QDR) {
         .attr('height', outerRadius * 2)
         .append('g')
         .attr('id', 'circle')
-        .attr('transform', 'translate(' + outerRadius + ',' + outerRadius + ')')
+        .attr('transform', 'translate(' + outerRadius + ',' + outerRadius + ')');
 
       // mouseover target for when the mouse leaves the diagram
       svg.append('circle')
@@ -210,6 +210,36 @@ var QDR = (function (QDR) {
     // global filter function that converts raw data to a matrix
     let filter = aggregateAddresses; 
     setFilter();
+
+    let getMatrix1 = function (filter) {
+      return new Promise( (function (resolve) {
+        let values = [];
+        if (last_values.values) {
+          last_values.values.forEach( function (lv) {
+            let newMessages = Math.floor((Math.random() * 10)) + 100;
+            values.push({ingress: lv.ingress, 
+              egress:  lv.egress, 
+              address: lv.address, 
+              messages: lv.messages + newMessages});
+          });
+        }
+
+        if ($scope.legendOptions.isRate) {
+          let rateValues = calcRate(values, last_values);
+          last_values.values = angular.copy(values);
+          last_values.timestamp = Date.now();
+          values = rateValues;
+        } else {
+          last_values.values = angular.copy(values);
+          last_values.timestamp = Date.now();
+        }
+        // convert the raw data to a matrix
+        let matrix = filter(values);
+        last_matrix = matrix;
+        // resolve the promise
+        resolve(matrix);
+      }));
+    };
 
     // construct a square matrix of the number of messages each router has egressed from each router
     let getMatrix = function (filter) {
@@ -281,6 +311,9 @@ var QDR = (function (QDR) {
             last_values.values = angular.copy(values);
             last_values.timestamp = Date.now();
             values = rateValues;
+          } else {
+            last_values.values = angular.copy(values);
+            last_values.timestamp = Date.now();
           }
           // convert the raw data to a matrix
           let matrix = filter(values);
@@ -291,6 +324,7 @@ var QDR = (function (QDR) {
       }));
     };
 
+    // compare the current values to the last_values and return the rate/second
     let calcRate = function (values, last_values) {
       let rateValues = [];
       let now = Date.now();
@@ -309,11 +343,12 @@ var QDR = (function (QDR) {
         rateValues.push({ingress: value.ingress, 
           egress: value.egress, 
           address: value.address,
-          messages: rate
+          messages: Math.max(rate, 0.01)
         });
       });
       return rateValues;
     };
+
     // create the chord diagram
     let render = function (matrix) {
       // if there is no data, hide the svg and show a message 
@@ -442,13 +477,14 @@ var QDR = (function (QDR) {
 
     // when viewing by address, adjust the arc's start and end angles so all arcs from a router are adjacent
     let fixArcs = function (fn, matrix) {
+      let gap = 0;
       let fixedGroups = fn();
       if (!matrix.aggregate) {
         for (let r=0, len=fixedGroups.length-1; r<len; r++) {
           if (matrix.rows[r].egress === matrix.rows[r+1].egress) {
             let midAngle = (fixedGroups[r].endAngle + fixedGroups[r+1].startAngle) / 2;
-            fixedGroups[r].endAngle = midAngle - .01;
-            fixedGroups[r+1].startAngle = midAngle + .01;
+            fixedGroups[r].endAngle = midAngle - gap;
+            fixedGroups[r+1].startAngle = midAngle + gap;
           } 
         }
       }
@@ -512,10 +548,7 @@ var QDR = (function (QDR) {
         .data(groupTicks)
         .transition()
         .duration(transitionDuration)
-        .attr('transform', function(d) {
-          return 'rotate(' + (d.angle * 180 / Math.PI - 90) + ')'
-         + 'translate(' + textRadius + ',0)';
-        });
+        .attrTween('transform', tickTween(last_chord));
       last_chord = rechord;
     }
 
@@ -548,6 +581,21 @@ var QDR = (function (QDR) {
 
         return function(t) {
           return chordReference(interpolate(t));
+        };
+      };
+    }
+
+    // animate the labels along a circular path
+    function tickTween(chord) {
+      return function(d) {
+        let i = Math.min(chord.groups().length - 1, d.index);
+        let startAngle = (chord.groups()[i].startAngle + chord.groups()[i].endAngle) / 2;
+        // d.angle is the ending angle
+        let interpolate = d3.interpolateNumber(startAngle, d.angle);
+
+        return function(t) {
+          return 'rotate(' + (interpolate(t) * 180 / Math.PI - 90) + ')'
+               + 'translate(' + textRadius + ',0)';
         };
       };
     }

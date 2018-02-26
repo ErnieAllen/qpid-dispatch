@@ -19,13 +19,13 @@ under the License.
 'use strict';
 /* global */
 
-// Matrix object
+// public Matrix object
 function valuesMatrix(aggregate) {
   this.rows = [];
   this.aggregate = aggregate;
 }
 // a matrix row
-function valuesMatrixRow(r, chordName, ingress, egress, address) {
+let valuesMatrixRow = function(r, chordName, ingress, egress, address) {
   this.chordName = chordName || '';
   this.address = address || '';
   this.ingress = ingress || '';
@@ -35,14 +35,14 @@ function valuesMatrixRow(r, chordName, ingress, egress, address) {
   for (let c=0; c<r; c++) {
     this.addCol(0);
   }
-}
+};
 // a matrix column
-function valuesMatrixCol(messages, row, c) {
+let valuesMatrixCol = function(messages, row, c) {
   this.messages = messages;
   this.addresses = [];
   this.index = c;
   this.row = row;
-}
+};
 
 // initialize a matrix with empty data with size rows and columns
 valuesMatrix.prototype.zeroInit = function (size) {
@@ -54,7 +54,7 @@ valuesMatrix.prototype.zeroInit = function (size) {
 valuesMatrix.prototype.hasValues = function () {
   return this.rows.some(function (row) {
     return row.cols.some(function (col) {
-      return col.messages !== 0;
+      return col.messages > 0.01;
     });
   });
 };

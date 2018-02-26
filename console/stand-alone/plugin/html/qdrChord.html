@@ -40,6 +40,10 @@
   }
   #legend .legend-line {
     margin: 1em;
+    border: 1px solid white;
+  }
+  #legend .legend-line:hover {
+    border: 1px dashed lightslategray;
   }
   
   .bootstrap-switch.bootstrap-switch-small {
@@ -50,12 +54,12 @@
   <div ng-controller="QDR.ChordController">
     <div ng-show="noValues"><h2>There is no message traffic</h2></div>
     <div id="chord"></div>
-    <div ng-hide="noValues" id="controls">
+    <div id="controls">
       <div id="switches">
         <span><input bootstrap-switch ng-model="legendOptions.isRate" type="checkbox"/> Rate</span>
-        <span><input bootstrap-switch ng-model="legendOptions.byAddress" type="checkbox"/> By Address</span>
+        <span ng-hide="noValues"><input bootstrap-switch ng-model="legendOptions.byAddress" type="checkbox"/> By Address</span>
       </div>
-      <div id="legend">
+      <div id="legend" ng-hide="noValues" >
         <h4>Routers</h4>
         <div ng-repeat="(router, color) in arcColors" class='legend-line' ng-mouseover="enterRouter(router)" ng-mouseleave="leaveLegend()">
           <span class='legend-color' style='background-color: {{color}};'></span>
