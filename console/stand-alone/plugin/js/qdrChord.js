@@ -22,10 +22,11 @@ under the License.
 var QDR = (function (QDR) {
   QDR.module.controller('QDR.ChordController', ['$scope', 'QDRService', '$location', '$timeout', function($scope, QDRService, $location, $timeout) {
 
+    const CHORDOPTIONSKEY = 'chordOptions';
     // flag to show/hide the 'There are no values' message on the html page
     $scope.noValues = true;
     // state of the slider buttons
-    $scope.legendOptions = {isRate: false, byAddress: false};
+    $scope.legendOptions = angular.fromJson(localStorage[CHORDOPTIONSKEY]) || {isRate: false, byAddress: false};
     // colors for the legend and the diagram
     $scope.chordColors = {};
     $scope.arcColors = {};
@@ -34,12 +35,14 @@ var QDR = (function (QDR) {
     $scope.$watch('legendOptions.byAddress', function (newValue, oldValue) {
       if (newValue !== oldValue) {
         startOver();
+        localStorage[CHORDOPTIONSKEY] = JSON.stringify($scope.legendOptions);
       }
     });
     // get notified when the rate slider is toggled
     $scope.$watch('legendOptions.isRate', function (newValue, oldValue) {
       if (newValue !== oldValue) {
         startOver();
+        localStorage[CHORDOPTIONSKEY] = JSON.stringify($scope.legendOptions);
       }
     });
 
@@ -79,6 +82,7 @@ var QDR = (function (QDR) {
       return;
     }
 
+    let fake_data = false;
     // the filter processes the raw data into a matrix suitable for the d3 library
     let setFilter = function () {
       filter = $scope.legendOptions.byAddress ? separateAddresses: aggregateAddresses;
@@ -100,11 +104,38 @@ var QDR = (function (QDR) {
         interval = setInterval(doUpdate, transitionDuration);
       });
     };
-    // diagram constants
-    const outerRadius = 720 / 2,
-      innerRadius = outerRadius - 130,
-      textRadius = innerRadius + 20,
-      arcPadding = .04;
+
+    let getRadius = function () {
+      let w = window,
+        d = document,
+        e = d.documentElement,
+        b = d.getElementsByTagName('body')[0],
+        x = w.innerWidth || e.clientWidth || b.clientWidth,
+        y = w.innerHeight|| e.clientHeight|| b.clientHeight;
+      return Math.floor((Math.min(x, y) * 0.9) / 2);
+    };
+
+    const arcPadding = .04;
+    // diagram sizes that change when browser is resized
+    let outerRadius, innerRadius, textRadius;
+    let setSizes = function () {
+      // size of circle + text
+      outerRadius = getRadius();
+      // size of chords
+      innerRadius = outerRadius - 130;
+      // arc ring around chords
+      textRadius = Math.min(innerRadius * 1.1, innerRadius + 15);
+    };
+    setSizes();
+
+    // TODO: handle window resizes
+    /*
+    let updateWindow  = function () {
+      setSizes();
+      startOver();
+    };
+    d3.select(window).on('resize.updatesvg', updateWindow);        
+    */
 
     // used for animation duration and the data refresh interval 
     let transitionDuration = 1000;
@@ -149,6 +180,7 @@ var QDR = (function (QDR) {
     // whenever the number of routers that have egressed messages changes
     let initSvg = function () {
       d3.select('#chord svg').remove();
+
       svg = d3.select('#chord').append('svg')
         .attr('width', outerRadius * 2)
         .attr('height', outerRadius * 2)
@@ -211,36 +243,6 @@ var QDR = (function (QDR) {
     let filter = aggregateAddresses; 
     setFilter();
 
-    let getMatrix1 = function (filter) {
-      return new Promise( (function (resolve) {
-        let values = [];
-        if (last_values.values) {
-          last_values.values.forEach( function (lv) {
-            let newMessages = Math.floor((Math.random() * 10)) + 100;
-            values.push({ingress: lv.ingress, 
-              egress:  lv.egress, 
-              address: lv.address, 
-              messages: lv.messages + newMessages});
-          });
-        }
-
-        if ($scope.legendOptions.isRate) {
-          let rateValues = calcRate(values, last_values);
-          last_values.values = angular.copy(values);
-          last_values.timestamp = Date.now();
-          values = rateValues;
-        } else {
-          last_values.values = angular.copy(values);
-          last_values.timestamp = Date.now();
-        }
-        // convert the raw data to a matrix
-        let matrix = filter(values);
-        last_matrix = matrix;
-        // resolve the promise
-        resolve(matrix);
-      }));
-    };
-
     // construct a square matrix of the number of messages each router has egressed from each router
     let getMatrix = function (filter) {
       // local helper functions to arrange the chords by router
@@ -255,6 +257,97 @@ var QDR = (function (QDR) {
         });
       };
       return new Promise( (function (resolve, reject) {
+        let fake = [
+          {
+            'ingress': 'Canton',
+            'egress': 'Brno',
+            'address': 'Fashion',
+            'messages': 506694,
+            'key': 'BrnoCantonFashion'
+          },
+          {
+            'ingress': 'Canton',
+            'egress': 'Brno',
+            'address': 'Weather',
+            'messages': 234285,
+            'key': 'BrnoCantonWeather'
+          },
+          {
+            'ingress': 'Raleigh',
+            'egress': 'Brno',
+            'address': 'Sports',
+            'messages': 348726,
+            'key': 'BrnoRaleighSports'
+          },
+          {
+            'ingress': 'Brno',
+            'egress': 'Canton',
+            'address': 'Fashion',
+            'messages': 183248,
+            'key': 'CantonBrnoFashion'
+          },
+          {
+            'ingress': 'Canton',
+            'egress': 'Canton',
+            'address': 'Fashion',
+            'messages': 569779,
+            'key': 'CantonCantonFashion'
+          },
+          {
+            'ingress': 'Westford',
+            'egress': 'Canton',
+            'address': 'News',
+            'messages': 60927,
+            'key': 'CantonWestfordNews'
+          },
+          {
+            'ingress': 'Canton',
+            'egress': 'Westford',
+            'address': 'News',
+            'messages': 692268,
+            'key': 'WestfordCantonNews'
+          },
+          {
+            'ingress': 'Westford',
+            'egress': 'Westford',
+            'address': 'News',
+            'messages': 96905,
+            'key': 'WestfordWestfordNews'
+          }
+        ];
+        if (fake_data) {
+          let values = fake;
+          if (last_values.values) {
+            values = [];
+            last_values.values.forEach( function (lv) {
+              let newMessages = Math.floor((Math.random() * 10)) + 10;
+              values.push({ingress: lv.ingress, 
+                egress:  lv.egress, 
+                address: lv.address, 
+                messages: lv.messages + newMessages});
+            });
+          }
+  
+          // sort the raw data by egress router name
+          genKeys(values);
+          sortByKeys(values);
+
+          if ($scope.legendOptions.isRate) {
+            let rateValues = calcRate(values, last_values);
+            last_values.values = angular.copy(values);
+            last_values.timestamp = Date.now();
+            values = rateValues;
+          } else {
+            last_values.values = angular.copy(values);
+            last_values.timestamp = Date.now();
+          }
+          // convert the raw data to a matrix
+          let matrix = filter(values);
+          last_matrix = matrix;
+          // resolve the promise
+          resolve(matrix);
+          return;
+        }
         // get the router.node and router.link info
         QDRService.management.topology.fetchAllEntities([
           {entity: 'router.node', attrs: ['id', 'index']},
@@ -380,7 +473,10 @@ var QDR = (function (QDR) {
         .style('fill', function(d) { return fillArc(matrix, d.index); })
         .style('stroke', function(d) { return fillArc(matrix, d.index); })
         .attr('d', arcReference)
-        .on('mouseover', mouseoverArc);
+        .on('mouseover', mouseoverArc)
+        .append('title').text(function (d) {
+          return arcTitle(d, matrix);
+        });
       // create chords
       svg.append('svg:g')
         .attr('class', 'chords')
@@ -462,7 +558,7 @@ var QDR = (function (QDR) {
         let r = d.source.index;
         from = matrix.rows[r].ingress;
         to = matrix.rows[r].egress;
-        address = matrix.rows[r].address + ': ';
+        address = matrix.rows[r].address + '\n';
       }
       let title = address + from
       + ' → ' + to
@@ -473,6 +569,24 @@ var QDR = (function (QDR) {
         + ': ' + formatNumber(d.target.value));
       }
       return title;
+    };
+    let arcTitle = function (d, matrix) {
+      let egress, value = 0;
+      if (matrix.aggregate) {
+        egress = matrix.rows[d.index].chordName;
+        value = d.value;
+      }
+      else {
+        egress = matrix.rows[d.index].egress;
+        matrix.rows.forEach( function (row) {
+          if (row.egress === egress) {
+            row.cols.forEach(function (col) {
+              value += col.messages;
+            });
+          }
+        });
+      }
+      return egress + ': ' + formatNumber(value);
     };
 
     // when viewing by address, adjust the arc's start and end angles so all arcs from a router are adjacent
@@ -527,7 +641,10 @@ var QDR = (function (QDR) {
         .data(fixArcs(rechord.groups, matrix))
         .transition()
         .duration(transitionDuration)
-        .attrTween('d', arcTween(last_chord));
+        .attrTween('d', arcTween(last_chord))
+        .select('title').text(function (d) {
+          return arcTitle(d, matrix);
+        });
     
       // update chords
       svg.select('.chords')
@@ -577,8 +694,15 @@ var QDR = (function (QDR) {
     function chordTween(chord) {
       return function(d,i) {
         i = Math.min(chord.chords().length - 1, i);
-        let interpolate = d3.interpolate(chord.chords()[i], d);
-
+        // avoid swapping cords that have similar begin and end arcs
+        let old = chord.chords()[i];
+        if (old.source.index === d.target.index &&
+            old.source.subindex === d.target.subindex) {
+          let s = old.source;
+          old.source = old.target;
+          old.target = s;
+        }
+        let interpolate = d3.interpolate(old, d);
         return function(t) {
           return chordReference(interpolate(t));
         };
@@ -592,7 +716,6 @@ var QDR = (function (QDR) {
         let startAngle = (chord.groups()[i].startAngle + chord.groups()[i].endAngle) / 2;
         // d.angle is the ending angle
         let interpolate = d3.interpolateNumber(startAngle, d.angle);
-
         return function(t) {
           return 'rotate(' + (interpolate(t) * 180 / Math.PI - 90) + ')'
                + 'translate(' + textRadius + ',0)';
@@ -601,9 +724,8 @@ var QDR = (function (QDR) {
     }
 
     function groupTicks(d) {
-      var k = d.value ? (d.endAngle - d.startAngle) / d.value : 0;
       return [{
-        angle: d.value * k / 2 + d.startAngle,
+        angle: (d.startAngle + d.endAngle) / 2,
         index: d.index
       }];
     }
@@ -632,6 +754,7 @@ var QDR = (function (QDR) {
       clearInterval(interval);
       // clean up memory associated with the svg
       d3.select('#chord').remove();
+      d3.select(window).on('resize.updatesvg', null);        
     });
 
     // get the raw data and render the svg
