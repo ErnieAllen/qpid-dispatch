@@ -52,9 +52,10 @@ valuesMatrix.prototype.zeroInit = function (size) {
 };
 // return true of any of the matrix cells have messages
 valuesMatrix.prototype.hasValues = function () {
+  const threshold = 0.01;
   return this.rows.some(function (row) {
     return row.cols.some(function (col) {
-      return col.messages > 0.01;
+      return col.messages > threshold;
     });
   });
 };
@@ -73,7 +74,7 @@ valuesMatrix.prototype.matrixMessages = function () {
 valuesMatrix.prototype.chordName = function (i, ingress) {
   if (this.aggregate)
     return this.rows[i].chordName;
-  return (ingress ? this.rows[i].ingress : this.rows[i].egress) + '-' + this.rows[i].address;
+  return (ingress ? this.rows[i].ingress : this.rows[i].egress);
 
 };
 valuesMatrix.prototype.routerName = function (i) {
@@ -108,7 +109,8 @@ valuesMatrixRow.prototype.addCol = function (messages) {
   this.cols.push(new valuesMatrixCol(messages, this, this.cols.length));
 };
 valuesMatrixCol.prototype.addMessages = function (messages) {
-  this.messages += messages;
+  if (!(this.messages === 0.01 && messages === 0.01))
+    this.messages += messages;
 };
 valuesMatrixCol.prototype.addAddress = function (address) {
   this.addresses.push(address);
@@ -133,6 +135,7 @@ valuesMatrix.prototype.sorted = function () {
       m.rows[newRow].ingress = row.ingress;
       m.rows[newRow].egress = row.egress;
       m.rows[newRow].cols[newCol].messages = col.messages;
+      m.rows[newRow].cols[newCol].addresses = col.addresses;
     }.bind(this));
   }.bind(this));
   return m;

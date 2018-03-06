@@ -45,33 +45,64 @@
   #legend .legend-line:hover {
     border: 1px dashed lightslategray;
   }
-  
+  #legend ul {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 0.5em;
+  }
+  #legend label {
+    font-weight: normal;
+  }
+
+  #legend ul li label input[type='checkbox'] {
+    position: relative;
+    top: 2px;
+    padding-right: 1em;
+  }
+  #legend ul li label {
+    margin-bottom: 0;
+  }
+
   .bootstrap-switch.bootstrap-switch-small {
       min-width: 72px;
+  }
+  .arrows path {
+    stroke: black;
+    opacity: 0.25;
+    stroke-width: 3;
+  }
+
+  path.empty {
+    fill: rgb(31, 119, 180);
+    fill-opacity: .67;
   }
   </style>
   
   <div ng-controller="QDR.ChordController">
     <div ng-show="noValues"><h2>There is no message traffic</h2></div>
     <div id="chord"></div>
+    {{addressList}}
     <div id="controls">
       <div id="switches">
         <span><input bootstrap-switch ng-model="legendOptions.isRate" type="checkbox"/> Rate</span>
         <span ng-hide="noValues"><input bootstrap-switch ng-model="legendOptions.byAddress" type="checkbox"/> By Address</span>
       </div>
       <div id="legend" ng-hide="noValues" >
-        <h4>Routers</h4>
-        <div ng-repeat="(router, color) in arcColors" class='legend-line' ng-mouseover="enterRouter(router)" ng-mouseleave="leaveLegend()">
-          <span class='legend-color' style='background-color: {{color}};'></span>
-          <span>{{router}}</span>
-        </div>
-        <div ng-if="legendOptions.byAddress">
-          <h4>Addresses</h4>
-          <div ng-repeat="(addr, color) in chordColors" class='legend-line' ng-mouseenter="enterLegend(addr)" ng-mouseleave="leaveLegend()">
+        <h4 ng-hide="noRouters()">Routers</h4>
+        <ul>
+          <li ng-repeat="(router, color) in arcColors" class="legend-line" ng-mouseover="enterRouter(router)" ng-mouseleave="leaveLegend()">
             <span class='legend-color' style='background-color: {{color}};'></span>
-            <span>{{addr}}</span>
-          </div>
-        </div>
+            <span>{{router}}</span>
+          </li>
+        </ul>
+        <h4>Addresses</h4>
+        <ul>
+          <li ng-repeat="(address, enabled) in addresses" class="legend-line">
+            <label ng-mouseenter="enterLegend(address)" ng-mouseleave="leaveLegend()">
+              <input type="checkbox" ng-model="addresses[address]" ng-change="addressFilterChanged()"/> {{address}} 
+            </label>
+          </li>
+        </ul>
       </div>
     </div>
   </div>

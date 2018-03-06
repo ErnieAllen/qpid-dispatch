@@ -17,16 +17,18 @@ specific language governing permissions and limitations
 under the License.
 */
 'use strict';
-/* global angular d3 Promise valuesMatrix */
+/* global angular d3 separateAddresses aggregateAddresses ChordData */
 
 var QDR = (function (QDR) {
   QDR.module.controller('QDR.ChordController', ['$scope', 'QDRService', '$location', '$timeout', function($scope, QDRService, $location, $timeout) {
 
     const CHORDOPTIONSKEY = 'chordOptions';
+    const CHORDFILTERKEY = 'chordFilter';
     // flag to show/hide the 'There are no values' message on the html page
     $scope.noValues = true;
     // state of the slider buttons
     $scope.legendOptions = angular.fromJson(localStorage[CHORDOPTIONSKEY]) || {isRate: false, byAddress: false};
+    let excludedAddresses = angular.fromJson(localStorage[CHORDFILTERKEY]) || [];
     // colors for the legend and the diagram
     $scope.chordColors = {};
     $scope.arcColors = {};
@@ -45,12 +47,25 @@ var QDR = (function (QDR) {
         localStorage[CHORDOPTIONSKEY] = JSON.stringify($scope.legendOptions);
       }
     });
+    $scope.addressFilterChanged = function () {
+      excludedAddresses = [];
+      for (let address in $scope.addresses) {
+        if (!$scope.addresses[address])
+          excludedAddresses.push(address);
+      }
+      localStorage[CHORDFILTERKEY] = JSON.stringify(excludedAddresses);
+      if (chordData) 
+        chordData.setFilter(excludedAddresses);
 
+      startOver();
+    };
     // called by angular when mouse enters one of the address legends
     $scope.enterLegend = function (addr) {
+      if (!$scope.legendOptions.byAddress)
+        return;
       // fade all chords that don't have this address 
       let indexes = [];
-      last_matrix.rows.forEach( function (row, r) {
+      chordData.last_matrix.rows.forEach( function (row, r) {
         if (row.address === addr) {
           indexes.push(r);
         }
@@ -63,7 +78,7 @@ var QDR = (function (QDR) {
     $scope.enterRouter = function (router) {
       let indexes = [];
       // fade all chords that are not associated with this router
-      last_matrix.rows.forEach( function (row, r) {
+      chordData.last_matrix.rows.forEach( function (row, r) {
         if (row.ingress === router || row.egress === router || row.chordName === router)
           indexes.push(r);
       });
@@ -74,6 +89,9 @@ var QDR = (function (QDR) {
     $scope.leaveLegend = function () {
       showAllChords();
     };
+    $scope.noRouters = function () {
+      return Object.keys($scope.arcColors).length == 0;
+    };
 
     // if we get here and there is no connection, redirect to the connect page and then 
     // return here once we are connected
@@ -82,25 +100,24 @@ var QDR = (function (QDR) {
       return;
     }
 
-    let fake_data = false;
-    // the filter processes the raw data into a matrix suitable for the d3 library
-    let setFilter = function () {
-      filter = $scope.legendOptions.byAddress ? separateAddresses: aggregateAddresses;
-    };
+    let chordData = new ChordData(QDRService, 
+      $scope.legendOptions.isRate, 
+      $scope.legendOptions.byAddress ? separateAddresses: aggregateAddresses);
+    chordData.setFilter(excludedAddresses);
+
     // clear the svg and recreate it.
     // called when we switch between showing aggregate diagram and by address diagram
     // also called when a new sender or receiver causes a new chord to show up
     let startOver = function () {
       clearInterval(interval);
-      setFilter();
+      chordData.setRate($scope.legendOptions.isRate);
+      chordData.setConverter($scope.legendOptions.byAddress ? separateAddresses: aggregateAddresses);
+
       initSvg();
       $timeout( function () {
         $scope.chordColors = {};
         $scope.arcColors = {};
-        getMatrix(filter)
-          .then( function (matrix) {
-            render(matrix);
-          });
+        chordData.getMatrix().then(render);
         interval = setInterval(doUpdate, transitionDuration);
       });
     };
@@ -112,7 +129,7 @@ var QDR = (function (QDR) {
         b = d.getElementsByTagName('body')[0],
         x = w.innerWidth || e.clientWidth || b.clientWidth,
         y = w.innerHeight|| e.clientHeight|| b.clientHeight;
-      return Math.floor((Math.min(x, y) * 0.9) / 2);
+      return Math.max(Math.floor((Math.min(x, y) * 0.9) / 2), 300);
     };
 
     const arcPadding = .04;
@@ -154,7 +171,11 @@ var QDR = (function (QDR) {
     // return the color associated with a chord.
     // if viewing by address, the color will be the address color.
     // if viewing aggregate, the color will be the router color of the largest chord ending
-    let fillChord = function (matrixValues, row, col) {
+    let fillChord = function (matrixValues, d) {
+      let row = d.source.index;
+      //let col = d.source.subindex;
+      return fillArc(matrixValues, row);
+      /*
       if (!$scope.legendOptions.byAddress) {
         return colorGen(row);
       }
@@ -164,14 +185,14 @@ var QDR = (function (QDR) {
         $scope.chordColors[addr] = colorGen(Object.keys($scope.chordColors).length + 
                                             Object.keys($scope.arcColors).length);
       return $scope.chordColors[addr];
+      */
     };
 
     let chord = d3.layout.chord()
       .padding(arcPadding);
 
     // keep track of previous chords so we can animate to the new values
-    let last_chord = chord, last_chord_length,
-      last_values = {values: undefined, timestamp: undefined}, last_matrix;
+    let last_chord = chord, last_chord_length;
 
     // global pointer to the diagram
     let svg;
@@ -201,249 +222,42 @@ var QDR = (function (QDR) {
     };
     initSvg();
 
-    // this filter will show an arc per router with the addresses aggregated
-    let aggregateAddresses = function (values) {
-      let m = new valuesMatrix(true);
-      values.forEach (function (value) {
-        let chordName = value.egress;
-        let egress = value.ingress;
-        let row = m.indexOf(chordName);
-        if (row < 0) {
-          row = m.addRow(chordName);
-        }
-        let col = m.indexOf(egress);
-        if (col < 0) {
-          col = m.addRow(egress);
-        }
-        m.addValue(row, col, value);
+    let emptyCircle = function () {
+      $scope.noValues = false;
+      $scope.addresses = chordData.getAddresses();
+      d3.select('#chord svg .empty').remove();
+
+      let arc = d3.svg.arc()
+        .innerRadius(innerRadius)
+        .outerRadius(textRadius)
+        .startAngle(0)
+        .endAngle(Math.PI * 2);
+
+      svg.append('path')
+        .attr('class', 'empty')
+        .attr('d', arc);
+    };
+
+    let genArcColors = function () {
+      $scope.arcColors = {};
+      let routers = chordData.getRouters();
+      routers.forEach( function (router) {
+        $scope.arcColors[router] = colorGen(Object.keys($scope.arcColors).length);
       });
-      return m.sorted();
     };
-
-    // this filter will show an arc per router-address
-    let separateAddresses = function (values) {
-      let m = new valuesMatrix(false);
-      values.forEach( function (value) {
-        let egressChordName = value.egress + value.ingress + value.address;
-        let r = m.indexOf(egressChordName);
-        if (r < 0) {
-          r = m.addRow(egressChordName, value.ingress, value.egress, value.address);
-        }
-        let ingressChordName = value.ingress + value.egress + value.address;
-        let c = m.indexOf(ingressChordName);
-        if (c < 0) {
-          c = m.addRow(ingressChordName, value.egress, value.ingress, value.address);
-        }
-        m.addValue(r, c, value);
-      });
-      return m.sorted();
-    };
-
-    // global filter function that converts raw data to a matrix
-    let filter = aggregateAddresses; 
-    setFilter();
-
-    // construct a square matrix of the number of messages each router has egressed from each router
-    let getMatrix = function (filter) {
-      // local helper functions to arrange the chords by router
-      let sortByKeys = function (values) {
-        return values.sort( function (a, b) {
-          return a.key > b.key ? 1 : a.key < b.key ? -1 : 0;
-        });
-      };
-      let genKeys = function (values) {
-        values.forEach( function (value) {
-          value.key = value.egress + value.ingress + value.address;
-        });
-      };
-      return new Promise( (function (resolve, reject) {
-        let fake = [
-          {
-            'ingress': 'Canton',
-            'egress': 'Brno',
-            'address': 'Fashion',
-            'messages': 506694,
-            'key': 'BrnoCantonFashion'
-          },
-          {
-            'ingress': 'Canton',
-            'egress': 'Brno',
-            'address': 'Weather',
-            'messages': 234285,
-            'key': 'BrnoCantonWeather'
-          },
-          {
-            'ingress': 'Raleigh',
-            'egress': 'Brno',
-            'address': 'Sports',
-            'messages': 348726,
-            'key': 'BrnoRaleighSports'
-          },
-          {
-            'ingress': 'Brno',
-            'egress': 'Canton',
-            'address': 'Fashion',
-            'messages': 183248,
-            'key': 'CantonBrnoFashion'
-          },
-          {
-            'ingress': 'Canton',
-            'egress': 'Canton',
-            'address': 'Fashion',
-            'messages': 569779,
-            'key': 'CantonCantonFashion'
-          },
-          {
-            'ingress': 'Westford',
-            'egress': 'Canton',
-            'address': 'News',
-            'messages': 60927,
-            'key': 'CantonWestfordNews'
-          },
-          {
-            'ingress': 'Canton',
-            'egress': 'Westford',
-            'address': 'News',
-            'messages': 692268,
-            'key': 'WestfordCantonNews'
-          },
-          {
-            'ingress': 'Westford',
-            'egress': 'Westford',
-            'address': 'News',
-            'messages': 96905,
-            'key': 'WestfordWestfordNews'
-          }
-        ];
-        if (fake_data) {
-          let values = fake;
-          if (last_values.values) {
-            values = [];
-            last_values.values.forEach( function (lv) {
-              let newMessages = Math.floor((Math.random() * 10)) + 10;
-              values.push({ingress: lv.ingress, 
-                egress:  lv.egress, 
-                address: lv.address, 
-                messages: lv.messages + newMessages});
-            });
-          }
-  
-          // sort the raw data by egress router name
-          genKeys(values);
-          sortByKeys(values);
-
-          if ($scope.legendOptions.isRate) {
-            let rateValues = calcRate(values, last_values);
-            last_values.values = angular.copy(values);
-            last_values.timestamp = Date.now();
-            values = rateValues;
-          } else {
-            last_values.values = angular.copy(values);
-            last_values.timestamp = Date.now();
-          }
-          // convert the raw data to a matrix
-          let matrix = filter(values);
-          last_matrix = matrix;
-          // resolve the promise
-          resolve(matrix);
-          return;
-        }
-        // get the router.node and router.link info
-        QDRService.management.topology.fetchAllEntities([
-          {entity: 'router.node', attrs: ['id', 'index']},
-          {entity: 'router.link', attrs: ['linkType', 'linkDir', 'owningAddr', 'ingressHistogram']}], 
-        function(results) {
-          if (!results) {
-            reject(Error('unable to fetch entities'));
-            return;
-          }
-          // the raw data received from the rouers
-          let values = [];
-
-          // for each router in the network
-          for (let nodeId in results) {
-            // get a map of router ids to index into ingressHistogram for the links for this router.
-            // each routers has a different order for the routers
-            let ingressRouters = [];
-            let routerNode = results[nodeId]['router.node'];
-            let idIndex = routerNode.attributeNames.indexOf('id');
-
-            // ingressRouters is an array of router names in the same order that the ingressHistogram values will be in
-            for (let i=0; i<routerNode.results.length; i++) {
-              ingressRouters.push(routerNode.results[i][idIndex]);
-            }
-
-            // the name of the router we are working on
-            let egressRouter = QDRService.management.topology.nameFromId(nodeId);
-
-            // loop through the router links for this router looking for out/endpoint/non-console links
-            let routerLinks = results[nodeId]['router.link'];
-            for (let i=0; i<routerLinks.results.length; i++) {
-              let link = QDRService.utilities.flatten(routerLinks.attributeNames, routerLinks.results[i]);
-              // if the link is an outbound/enpoint/non console
-              if (link.linkType === 'endpoint' && link.linkDir === 'out' && !link.owningAddr.startsWith('Ltemp.')) {
-                // keep track of the raw egress values as well as their ingress and egress routers and the address
-                for (let j=0; j<ingressRouters.length; j++) {
-                  let messages = link.ingressHistogram[j];
-                  if (messages) {
-                    values.push({ingress: ingressRouters[j], 
-                      egress:  egressRouter, 
-                      address: QDRService.utilities.addr_text(link.owningAddr), 
-                      messages: messages});
-                  }
-                }
-              }
-            }
-          }
-          // sort the raw data by egress router name
-          genKeys(values);
-          sortByKeys(values);
-
-          if ($scope.legendOptions.isRate) {
-            let rateValues = calcRate(values, last_values);
-            last_values.values = angular.copy(values);
-            last_values.timestamp = Date.now();
-            values = rateValues;
-          } else {
-            last_values.values = angular.copy(values);
-            last_values.timestamp = Date.now();
-          }
-          // convert the raw data to a matrix
-          let matrix = filter(values);
-          last_matrix = matrix;
-          // resolve the promise
-          resolve(matrix);
-        });
-      }));
-    };
-
-    // compare the current values to the last_values and return the rate/second
-    let calcRate = function (values, last_values) {
-      let rateValues = [];
-      let now = Date.now();
-      let elapsed = last_values.timestamp ? (now - last_values.timestamp) / 1000 : 0;
-      values.forEach( function (value) {
-        let last_index = last_values.values ? 
-          last_values.values.findIndex( function (lv) {
-            return lv.ingress === value.ingress &&
-            lv.egress === value.egress &&
-            lv.address === value.address; 
-          }) : -1;
-        let rate = 0;
-        if (last_index >= 0) {
-          rate = (value.messages - last_values.values[last_index].messages) / elapsed;
-        }
-        rateValues.push({ingress: value.ingress, 
-          egress: value.egress, 
-          address: value.address,
-          messages: Math.max(rate, 0.01)
-        });
-      });
-      return rateValues;
-    };
-
     // create the chord diagram
     let render = function (matrix) {
+      // populate the arcColors object with a color for each router
+      genArcColors();
+
+      // if all the addresses are excluded, just show an empty circle
+      if (excludedAddresses.length === Object.keys(chordData.getAddresses()).length) {
+        $timeout( function () {
+          emptyCircle();
+        });
+        return;
+      }
+
       // if there is no data, hide the svg and show a message 
       if (!matrix.hasValues()) {
         d3.select('#chord svg').remove();
@@ -452,6 +266,11 @@ var QDR = (function (QDR) {
         });
         return;
       }
+
+      $timeout( function () {
+        $scope.addresses = chordData.getAddresses();
+      });
+
       // pass just the raw numbers to the library
       chord.matrix(matrix.matrixMessages());
       last_chord = chord;
@@ -483,8 +302,8 @@ var QDR = (function (QDR) {
         .selectAll('path')
         .data(chord.chords)
         .enter().append('svg:path')
-        .style('stroke', function(d) { return d3.rgb(fillChord(matrix, d.source.index, d.source.subindex)).darker(); })
-        .style('fill', function(d) { return fillChord(matrix, d.source.index, d.source.subindex); })
+        .style('stroke', function(d) { return d3.rgb(fillChord(matrix, d)).darker(); })
+        .style('fill', function(d) { return fillChord(matrix, d); })
         .attr('d', d3.svg.chord().radius(innerRadius))
         .on('mouseover', mouseoverChord)
         .append('title').text(function(d) {
@@ -495,7 +314,7 @@ var QDR = (function (QDR) {
       let ticks = svg.append('svg:g')
         .attr('class', 'ticks')
         .selectAll('g')
-        .data(chord.groups)
+        .data(consolidateLabels(chord.groups, matrix))
         .enter().append('svg:g')
         .on('mouseover', mouseoverArc)
         .attr('class', 'group')
@@ -531,7 +350,7 @@ var QDR = (function (QDR) {
           return d.angle > Math.PI ? 'rotate(180)translate(-16)' : null;
         })
         .text(function(d) { 
-          return matrix.chordName(d.index, false);
+          return matrix.chordName(d.orgIndex, false);
         });
 
       // size the rects around the labels so they respond to mouse events 
@@ -589,6 +408,30 @@ var QDR = (function (QDR) {
       return egress + ': ' + formatNumber(value);
     };
 
+    let consolidateLabels = function (fn, matrix) {
+      let fixedGroups = fn();
+      if (!matrix.aggregate) {
+        let consolidatedGroups = [];
+        for (let r=0, len=fixedGroups.length, laste=''; r<len; r++) {
+          let fg = fixedGroups[r];
+          let e = matrix.rows[r].egress;
+          if (e !== laste) {
+            consolidatedGroups.push({startAngle: fg.startAngle, endAngle: fg.endAngle, index: consolidatedGroups.length, orgIndex: fg.index});
+          } else {
+            consolidatedGroups[consolidatedGroups.length-1].endAngle = fg.endAngle;
+          }
+          laste = e;
+        }
+        fixedGroups = consolidatedGroups;
+      } else {
+        fixedGroups.forEach( function (fg) {
+          fg.orgIndex = fg.index;
+        });
+      }
+      return function () {
+        return fixedGroups;
+      };
+    };
     // when viewing by address, adjust the arc's start and end angles so all arcs from a router are adjacent
     let fixArcs = function (fn, matrix) {
       let gap = 0;
@@ -610,6 +453,14 @@ var QDR = (function (QDR) {
 
     // after the svg is initialized, this is called periodically to animate the diagram to the new positions
     function rerender(matrix) {
+      // if all the addresses are excluded, just show an empty circle
+      if (excludedAddresses.length === Object.keys(chordData.getAddresses()).length) {
+        $timeout( function () {
+          emptyCircle();
+        });
+        return;
+      }
+
       // if there is no data, hide the svg and show a message 
       if (!matrix.hasValues()) {
         d3.select('#chord svg').remove();
@@ -618,6 +469,10 @@ var QDR = (function (QDR) {
         });
         return;
       }
+      $timeout( function () {
+        $scope.addresses = chordData.getAddresses();
+      });
+
       // create a new chord layout so we can animate between the last one and this one
       let rechord = d3.layout.chord()
         .padding(arcPadding)
@@ -660,12 +515,12 @@ var QDR = (function (QDR) {
       // update ticks
       svg.selectAll('.ticks')
         .selectAll('.group')
-        .data(rechord.groups)
+        .data(consolidateLabels(rechord.groups, matrix))
         .selectAll('.routers')
         .data(groupTicks)
         .transition()
         .duration(transitionDuration)
-        .attrTween('transform', tickTween(last_chord));
+        .attrTween('transform', tickTween(last_chord, matrix));
       last_chord = rechord;
     }
 
@@ -710,10 +565,11 @@ var QDR = (function (QDR) {
     }
 
     // animate the labels along a circular path
-    function tickTween(chord) {
+    function tickTween(chord, matrix) {
       return function(d) {
-        let i = Math.min(chord.groups().length - 1, d.index);
-        let startAngle = (chord.groups()[i].startAngle + chord.groups()[i].endAngle) / 2;
+        let groups = consolidateLabels(chord.groups, matrix);
+        let i = Math.min(groups().length - 1, d.index);
+        let startAngle = (groups()[i].startAngle + groups()[i].endAngle) / 2;
         // d.angle is the ending angle
         let interpolate = d3.interpolateNumber(startAngle, d.angle);
         return function(t) {
@@ -726,7 +582,8 @@ var QDR = (function (QDR) {
     function groupTicks(d) {
       return [{
         angle: (d.startAngle + d.endAngle) / 2,
-        index: d.index
+        index: d.index,
+        orgIndex: d.orgIndex
       }];
     }
 
@@ -758,21 +615,14 @@ var QDR = (function (QDR) {
     });
 
     // get the raw data and render the svg
-    getMatrix(filter)
-      .then(function (matrix) {
-        render(matrix);
-      });
+    chordData.getMatrix().then(render);
     // called periodically to refresh the data
     function doUpdate() {
-      getMatrix(filter)
-        .then( function (matrix) {
-          rerender(matrix);
-        });
+      chordData.getMatrix().then(rerender);
     }
-    let interval = setInterval(doUpdate, transitionDuration*0.90);
+    let interval = setInterval(doUpdate, transitionDuration);
   
   }]);
   return QDR;
 
 } (QDR || {}));
-
