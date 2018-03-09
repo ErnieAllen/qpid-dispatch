@@ -38,6 +38,12 @@
     height: 1em;
     display: inline-block;
   }
+  #legend .legend-address {
+    padding: 0.1em 0.5em 0.2em;
+    position: absolute;
+    left: 10px;
+    top: -5px;
+  }
   #legend .legend-line {
     margin: 1em;
     border: 1px solid white;
@@ -50,10 +56,6 @@
     padding-left: 0;
     margin-bottom: 0.5em;
   }
-  #legend label {
-    font-weight: normal;
-  }
-
   #legend ul li label input[type='checkbox'] {
     position: relative;
     top: 2px;
@@ -61,11 +63,30 @@
   }
   #legend ul li label {
     margin-bottom: 0;
+    font-weight: normal;
   }
-
+  /* the checkboxes for the addresses */
+  #legend ul li input[type=checkbox]:checked + label::before {
+    content:'\2713';
+    font-weight: bold;
+    display:inline-block;
+    padding:0 6px 0 0;
+    color: white;
+    position: absolute;
+    top: -4px;
+  }
+  /* The aggregate addresses need a black checkbox on the white background */
+  #legend ul li input[type=checkbox]:checked + label.aggregate::before {
+    color: black;
+    left: 1px;
+  }
   .bootstrap-switch.bootstrap-switch-small {
       min-width: 72px;
   }
+  .legend-address {
+    color: black;
+  }
+
   .arrows path {
     stroke: black;
     opacity: 0.25;
@@ -76,6 +97,59 @@
     fill: rgb(31, 119, 180);
     fill-opacity: .67;
   }
+
+  /**
+ * Checkbox Four
+ */
+
+#legend input[type=checkbox] {
+	visibility: hidden;
+}
+.checkboxFour {
+  width: 12px;
+  height: 12px;
+	background: #ddd;
+	position: relative;
+
+	-webkit-box-shadow: 0px 1px 3px rgba(0,0,0,0.5);
+	-moz-box-shadow: 0px 1px 3px rgba(0,0,0,0.5);
+	box-shadow: 0px 1px 3px rgba(0,0,0,0.5); 
+  
+}
+
+/**
+ * Create the checkbox button
+ */
+.checkboxFour label {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	/*border-radius: 100%;*/
+
+	-webkit-transition: all .5s ease;
+	-moz-transition: all .5s ease;
+	-o-transition: all .5s ease;
+	-ms-transition: all .5s ease;
+	transition: all .5s ease;
+	cursor: pointer;
+	position: absolute;
+	top: 1px;
+	left: 1px;
+	z-index: 1;
+
+	background: #333;
+
+	-webkit-box-shadow:inset 0px 1px 3px rgba(0,0,0,0.5);
+	-moz-box-shadow:inset 0px 1px 3px rgba(0,0,0,0.5);
+	box-shadow:inset 0px 1px 3px rgba(0,0,0,0.5);
+}
+
+#legend ul.addresses li {
+  margin-top: 1.5em;
+}
+#legend ul.addresses {
+  margin-bottom: 1.5em;
+}
   </style>
   
   <div ng-controller="QDR.ChordController">
@@ -88,22 +162,23 @@
         <span ng-hide="noValues"><input bootstrap-switch ng-model="legendOptions.byAddress" type="checkbox"/> By Address</span>
       </div>
       <div id="legend" ng-hide="noValues" >
-        <h4 ng-hide="noRouters()">Routers</h4>
+        <h4>Routers</h4>
         <ul>
           <li ng-repeat="(router, color) in arcColors" class="legend-line" ng-mouseover="enterRouter(router)" ng-mouseleave="leaveLegend()">
-            <span class='legend-color' style='background-color: {{color}};'></span>
+            <span class='legend-color' ng-style="{'background-color': color}"></span>
             <span>{{router}}</span>
           </li>
         </ul>
         <h4>Addresses</h4>
-        <ul>
-          <li ng-repeat="(address, enabled) in addresses" class="legend-line">
-            <label ng-mouseenter="enterLegend(address)" ng-mouseleave="leaveLegend()">
-              <input type="checkbox" ng-model="addresses[address]" ng-change="addressFilterChanged()"/> {{address}} 
-            </label>
+        <ul class="addresses">
+          <li ng-repeat="(address, color) in addresses" class="legend-line">
+            <div class="checkboxFour" ng-mouseenter="enterLegend(address)" ng-mouseleave="leaveLegend()" style="background-color: {{chordColors[address]}};">
+              <input type="checkbox" value="1" id="addr-{{address}}" name="" ng-model="addresses[address]" ng-change="addressFilterChanged()"/>
+              <label ng-class="legendOptions.byAddress ? 'byAddress' : 'aggregate'" for="addr-{{address}}" ng-style="{'background-color': chordColors[address] || 'white'}"></label>
+              <span class='legend-address'>{{address}}</span> 
+            </div>                
           </li>
         </ul>
       </div>
     </div>
   </div>
-  

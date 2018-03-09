@@ -22,6 +22,13 @@ under the License.
 var QDR = (function (QDR) {
   QDR.module.controller('QDR.ChordController', ['$scope', 'QDRService', '$location', '$timeout', function($scope, QDRService, $location, $timeout) {
 
+    // if we get here and there is no connection, redirect to the connect page and then 
+    // return here once we are connected
+    if (!QDRService.management.connection.is_connected()) {
+      QDR.redirectWhenConnected($location, 'chord');
+      return;
+    }
+
     const CHORDOPTIONSKEY = 'chordOptions';
     const CHORDFILTERKEY = 'chordFilter';
     // flag to show/hide the 'There are no values' message on the html page
@@ -36,6 +43,8 @@ var QDR = (function (QDR) {
     // get notified when the byAddress slider is toggled
     $scope.$watch('legendOptions.byAddress', function (newValue, oldValue) {
       if (newValue !== oldValue) {
+        d3.select('#legend')
+          .classed('byAddress', newValue);
         startOver();
         localStorage[CHORDOPTIONSKEY] = JSON.stringify($scope.legendOptions);
       }
@@ -89,16 +98,6 @@ var QDR = (function (QDR) {
     $scope.leaveLegend = function () {
       showAllChords();
     };
-    $scope.noRouters = function () {
-      return Object.keys($scope.arcColors).length == 0;
-    };
-
-    // if we get here and there is no connection, redirect to the connect page and then 
-    // return here once we are connected
-    if (!QDRService.management.connection.is_connected()) {
-      QDR.redirectWhenConnected($location, 'chord');
-      return;
-    }
 
     let chordData = new ChordData(QDRService, 
       $scope.legendOptions.isRate, 
@@ -132,7 +131,7 @@ var QDR = (function (QDR) {
       return Math.max(Math.floor((Math.min(x, y) * 0.9) / 2), 300);
     };
 
-    const arcPadding = .04;
+    const arcPadding = .06;
     // diagram sizes that change when browser is resized
     let outerRadius, innerRadius, textRadius;
     let setSizes = function () {
@@ -173,19 +172,16 @@ var QDR = (function (QDR) {
     // if viewing aggregate, the color will be the router color of the largest chord ending
     let fillChord = function (matrixValues, d) {
       let row = d.source.index;
-      //let col = d.source.subindex;
-      return fillArc(matrixValues, row);
-      /*
       if (!$scope.legendOptions.byAddress) {
-        return colorGen(row);
+        return fillArc(matrixValues, row);
       }
       // by address
+      let col = d.source.subindex;
       let addr = matrixValues.addressName(col);
       if (!(addr in $scope.chordColors))
         $scope.chordColors[addr] = colorGen(Object.keys($scope.chordColors).length + 
                                             Object.keys($scope.arcColors).length);
       return $scope.chordColors[addr];
-      */
     };
 
     let chord = d3.layout.chord()
@@ -245,10 +241,21 @@ var QDR = (function (QDR) {
         $scope.arcColors[router] = colorGen(Object.keys($scope.arcColors).length);
       });
     };
+    let genChordColors = function () {
+      if ($scope.legendOptions.byAddress) {
+        $scope.addresses = chordData.getAddresses();
+        let offset = Object.keys($scope.arcColors).length;
+        Object.keys($scope.addresses).forEach( function (address, i) {
+          $scope.chordColors[address] = colorGen(i + offset);
+        });
+      }
+    };
+
     // create the chord diagram
     let render = function (matrix) {
       // populate the arcColors object with a color for each router
       genArcColors();
+      genChordColors();
 
       // if all the addresses are excluded, just show an empty circle
       if (excludedAddresses.length === Object.keys(chordData.getAddresses()).length) {
