@@ -477,6 +477,7 @@ var QDR = (function (QDR) {
         return;
       }
       $timeout( function () {
+        $scope.noValues = false;
         $scope.addresses = chordData.getAddresses();
       });
 

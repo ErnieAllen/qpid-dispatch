@@ -140,23 +140,21 @@ let calcRate = function (values, last_values) {
   let now = Date.now();
   let elapsed = last_values.timestamp ? (now - last_values.timestamp) / 1000 : 0;
   values.forEach( function (value) {
-    if (value.included) {
-      let last_index = last_values.values ? 
-        last_values.values.findIndex( function (lv) {
-          return lv.ingress === value.ingress &&
-              lv.egress === value.egress &&
-              lv.address === value.address; 
-        }) : -1;
-      let rate = 0;
-      if (last_index >= 0) {
-        rate = (value.messages - last_values.values[last_index].messages) / elapsed;
-      }
-      rateValues.push({ingress: value.ingress, 
-        egress: value.egress, 
-        address: value.address,
-        messages: Math.max(rate, 0.01)
-      });
+    let last_index = last_values.values ? 
+      last_values.values.findIndex( function (lv) {
+        return lv.ingress === value.ingress &&
+            lv.egress === value.egress &&
+            lv.address === value.address; 
+      }) : -1;
+    let rate = 0;
+    if (last_index >= 0) {
+      rate = (value.messages - last_values.values[last_index].messages) / elapsed;
     }
+    rateValues.push({ingress: value.ingress, 
+      egress: value.egress, 
+      address: value.address,
+      messages: Math.max(rate, 0.01)
+    });
   });
   return rateValues;
 };
