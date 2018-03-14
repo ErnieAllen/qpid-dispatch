@@ -87,9 +87,15 @@ var QDR = (function (QDR) {
     $scope.enterRouter = function (router) {
       let indexes = [];
       // fade all chords that are not associated with this router
+      let agg = chordData.last_matrix.aggregate;
       chordData.last_matrix.rows.forEach( function (row, r) {
-        if (row.ingress === router || row.egress === router || row.chordName === router)
-          indexes.push(r);
+        if (agg) {
+          if (row.chordName === router)
+            indexes.push(r);
+        } else {
+          if (row.ingress === router || row.egress === router)
+            indexes.push(r);
+        }
       });
       d3.selectAll('.chords path').classed('fade', function(p) {
         return indexes.indexOf(p.source.index) < 0 && indexes.indexOf(p.target.index) < 0;
@@ -258,7 +264,9 @@ var QDR = (function (QDR) {
       genChordColors();
 
       // if all the addresses are excluded, just show an empty circle
-      if (excludedAddresses.length === Object.keys(chordData.getAddresses()).length) {
+      let chordAddresses = chordData.getAddresses();
+      let addressLen = Object.keys(chordAddresses).length;
+      if (addressLen > 0 && excludedAddresses.length === addressLen) {
         $timeout( function () {
           emptyCircle();
         });
@@ -461,7 +469,10 @@ var QDR = (function (QDR) {
     // after the svg is initialized, this is called periodically to animate the diagram to the new positions
     function rerender(matrix) {
       // if all the addresses are excluded, just show an empty circle
-      if (excludedAddresses.length === Object.keys(chordData.getAddresses()).length) {
+      // if all the addresses are excluded, just show an empty circle
+      let chordAddresses = chordData.getAddresses();
+      let addressLen = Object.keys(chordAddresses).length;
+      if (addressLen > 0 && excludedAddresses.length === addressLen) {
         $timeout( function () {
           emptyCircle();
         });
