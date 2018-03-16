@@ -32,6 +32,7 @@
     float: right;
     padding: 0 1em;
     border: 1px solid black;
+    border-radius: 4px;
   }
   #legend .legend-color {
     width: 1em;
@@ -69,16 +70,18 @@
   #legend ul li input[type=checkbox]:checked + label::before {
     content:'\2713';
     font-weight: bold;
+    font-size: 14px;
     display:inline-block;
-    padding:0 6px 0 0;
+    /* padding:0 6px 0 0; */
     color: white;
     position: absolute;
-    top: -4px;
+    top: -7px;
+    left: -1px;
   }
   /* The aggregate addresses need a black checkbox on the white background */
   #legend ul li input[type=checkbox]:checked + label.aggregate::before {
     color: black;
-    left: 1px;
+    /* left: 1px; */
   }
   .bootstrap-switch.bootstrap-switch-small {
       min-width: 72px;
@@ -108,13 +111,15 @@
 .checkboxFour {
   width: 12px;
   height: 12px;
-	background: #ddd;
+	background: #333;
 	position: relative;
+  margin: 4px 0;
 
+/*
 	-webkit-box-shadow: 0px 1px 3px rgba(0,0,0,0.5);
 	-moz-box-shadow: 0px 1px 3px rgba(0,0,0,0.5);
 	box-shadow: 0px 1px 3px rgba(0,0,0,0.5); 
-  
+  */
 }
 
 /**
@@ -138,14 +143,15 @@
 	z-index: 1;
 
 	background: #333;
-
+/*
 	-webkit-box-shadow:inset 0px 1px 3px rgba(0,0,0,0.5);
 	-moz-box-shadow:inset 0px 1px 3px rgba(0,0,0,0.5);
 	box-shadow:inset 0px 1px 3px rgba(0,0,0,0.5);
+  */
 }
 
 #legend ul.addresses li {
-  margin-top: 1.5em;
+  margin-top: 0.5em;
 }
 #legend ul.addresses {
   margin-bottom: 1.5em;
@@ -155,7 +161,6 @@
   <div ng-controller="QDR.ChordController">
     <div ng-show="noValues"><h2>There is no message traffic</h2></div>
     <div id="chord"></div>
-    {{addressList}}
     <div id="controls">
       <div id="switches">
         <span><input bootstrap-switch ng-model="legendOptions.isRate" type="checkbox"/> Rate</span>
@@ -175,8 +180,8 @@
             <div class="checkboxFour" ng-mouseenter="enterLegend(address)" ng-mouseleave="leaveLegend()" style="background-color: {{chordColors[address]}};">
               <input type="checkbox" value="1" id="addr-{{address}}" name="" ng-model="addresses[address]" ng-change="addressFilterChanged()"/>
               <label ng-class="legendOptions.byAddress ? 'byAddress' : 'aggregate'" for="addr-{{address}}" ng-style="{'background-color': chordColors[address] || 'white'}"></label>
-              <span class='legend-address'>{{address}}</span> 
-            </div>                
+              <span ng-click="addressClick(address)" class='legend-address'>{{address}}</span> 
+            </div>
           </li>
         </ul>
       </div>

@@ -104,6 +104,10 @@ var QDR = (function (QDR) {
     $scope.leaveLegend = function () {
       showAllChords();
     };
+    $scope.addressClick = function (address) {
+      $scope.addresses[address] = !$scope.addresses[address];
+      $scope.addressFilterChanged();
+    };
 
     let chordData = new ChordData(QDRService, 
       $scope.legendOptions.isRate, 
