@@ -24,8 +24,16 @@
   #controls #switches {
     float: left;
   }
+  #controls #switches ul {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 0.5em;
+  }
+  #controls #switches li {
+    margin-bottom: 0.5em;
+  }
   #controls #switches span {
-    display: inline-block;
+    display: block;
     padding-right: 1em;
   }
   #controls #legend {
@@ -70,12 +78,12 @@
   #legend ul li input[type=checkbox]:checked + label::before {
     content:'\2713';
     font-weight: bold;
-    font-size: 14px;
+    font-size: 16px;
     display:inline-block;
     /* padding:0 6px 0 0; */
     color: white;
     position: absolute;
-    top: -7px;
+    top: -8px;
     left: -1px;
   }
   /* The aggregate addresses need a black checkbox on the white background */
@@ -109,10 +117,9 @@
 	visibility: hidden;
 }
 .checkboxFour {
-  width: 12px;
-  height: 12px;
-	background: #333;
-	position: relative;
+  width: 14px;
+  height: 14px;
+  position: relative;
   margin: 4px 0;
 
 /*
@@ -125,24 +132,23 @@
 /**
  * Create the checkbox button
  */
-.checkboxFour label {
-	display: inline-block;
-	width: 10px;
-	height: 10px;
-	/*border-radius: 100%;*/
-
-	-webkit-transition: all .5s ease;
-	-moz-transition: all .5s ease;
-	-o-transition: all .5s ease;
-	-ms-transition: all .5s ease;
-	transition: all .5s ease;
-	cursor: pointer;
-	position: absolute;
-	top: 1px;
-	left: 1px;
-	z-index: 1;
-
-	background: #333;
+ .checkboxFour label {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  -webkit-transition: all .5s ease;
+  -moz-transition: all .5s ease;
+  -o-transition: all .5s ease;
+  -ms-transition: all .5s ease;
+  transition: all .5s ease;
+  cursor: pointer;
+  position: absolute;
+  top: 1px;
+  left: -1px;
+  z-index: 1;
+  border: 1px solid #333;
+  padding: 2px;
+}
 /*
 	-webkit-box-shadow:inset 0px 1px 3px rgba(0,0,0,0.5);
 	-moz-box-shadow:inset 0px 1px 3px rgba(0,0,0,0.5);
@@ -156,6 +162,13 @@
 #legend ul.addresses {
   margin-bottom: 1.5em;
 }
+
+.code-branch:before {
+  font-style: normal;
+  font-family: FontAwesome;
+  content: "\f126";
+}
+
   </style>
   
   <div ng-controller="QDR.ChordController">
@@ -163,8 +176,10 @@
     <div id="chord"></div>
     <div id="controls">
       <div id="switches">
-        <span><input bootstrap-switch ng-model="legendOptions.isRate" type="checkbox"/> Rate</span>
-        <span ng-hide="noValues"><input bootstrap-switch ng-model="legendOptions.byAddress" type="checkbox"/> By Address</span>
+        <ul>
+          <li><span><input bootstrap-switch ng-model="legendOptions.isRate" type="checkbox"/> Rate</span></li>
+          <li><span ng-hide="noValues"><input bootstrap-switch ng-model="legendOptions.byAddress" type="checkbox"/> By Address</span></li>
+        </ul>
       </div>
       <div id="legend" ng-hide="noValues" >
         <h4>Routers</h4>
@@ -179,7 +194,7 @@
           <li ng-repeat="(address, color) in addresses" class="legend-line">
             <div class="checkboxFour" ng-mouseenter="enterLegend(address)" ng-mouseleave="leaveLegend()" style="background-color: {{chordColors[address]}};">
               <input type="checkbox" value="1" id="addr-{{address}}" name="" ng-model="addresses[address]" ng-change="addressFilterChanged()"/>
-              <label ng-class="legendOptions.byAddress ? 'byAddress' : 'aggregate'" for="addr-{{address}}" ng-style="{'background-color': chordColors[address] || 'white'}"></label>
+              <label ng-class="legendOptions.byAddress ? 'byAddress' : 'aggregate'" for="addr-{{address}}" ng-style="{'background-color': chordColors[address] || 'white', 'border': '1px solid {{chordColors[address] || '#333'}}'}"></label>
               <span ng-click="addressClick(address)" class='legend-address'>{{address}}</span> 
             </div>
           </li>
