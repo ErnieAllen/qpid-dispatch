@@ -84,6 +84,7 @@ foreach(py_test_module
     system_tests_one_router
     system_tests_handle_failover
     system_tests_default_distribution
+    system_tests_deprecated
     system_tests_policy
     system_tests_protocol_family
     system_tests_protocol_settings
@@ -104,6 +105,9 @@ foreach(py_test_module
     system_tests_delivery_abort
     system_tests_topology
     system_tests_topology_disposition
+    system_tests_topology_addition
+    system_tests_disallow_link_resumable_link_route
+    system_tests_exchange_bindings
     ${SYSTEM_TESTS_HTTP}
     )
 

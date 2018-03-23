@@ -104,18 +104,19 @@ class LinkRouteTest(TestCase):
                    # This is an on-demand connection made from QDR.B's ephemeral port to d_listener_port
                    ('connector', {'name': 'routerD', 'role': 'route-container', 'host': '0.0.0.0', 'port': d_listener_port, 'saslMechanisms': 'ANONYMOUS'}),
 
-                   #('linkRoute', {'prefix': 'org.apache', 'connection': 'broker', 'dir': 'in'}),
-                   ('linkRoute', {'prefix': 'org.apache', 'containerId': 'QDR.A', 'dir': 'in'}),
-                   ('linkRoute', {'prefix': 'org.apache', 'containerId': 'QDR.A', 'dir': 'out'}),
+                   #('linkRoute', {'prefix': 'org.apache', 'connection': 'broker', 'direction': 'in'}),
+                   ('linkRoute', {'prefix': 'org.apache', 'containerId': 'QDR.A', 'direction': 'in'}),
+                   ('linkRoute', {'prefix': 'org.apache', 'containerId': 'QDR.A', 'direction': 'out'}),
 
-                   ('linkRoute', {'prefix': 'pulp.task', 'connection': 'test-tag', 'dir': 'in'}),
-                   ('linkRoute', {'prefix': 'pulp.task', 'connection': 'test-tag', 'dir': 'out'}),
+                   ('linkRoute', {'prefix': 'pulp.task', 'connection': 'test-tag', 'direction': 'in'}),
+                   ('linkRoute', {'prefix': 'pulp.task', 'connection': 'test-tag', 'direction': 'out'}),
 
                    # addresses matching pattern 'a.*.toA.#' route to QDR.A
-                   ('linkRoute', {'pattern': 'a.*.toA.#', 'containerId': 'QDR.A', 'dir': 'in'}),
-                   ('linkRoute', {'pattern': 'a.*.toA.#', 'containerId': 'QDR.A', 'dir': 'out'}),
+                   ('linkRoute', {'pattern': 'a.*.toA.#', 'containerId': 'QDR.A', 'direction': 'in'}),
+                   ('linkRoute', {'pattern': 'a.*.toA.#', 'containerId': 'QDR.A', 'direction': 'out'}),
 
                    # addresses matching pattern 'a.*.toD.#' route to QDR.D
+                   # Dont change dir to direction here so we can make sure that the dir attribute is still working.
                    ('linkRoute', {'pattern': 'a.*.toD.#', 'containerId': 'QDR.D', 'dir': 'in'}),
                    ('linkRoute', {'pattern': 'a.*.toD.#', 'containerId': 'QDR.D', 'dir': 'out'})
 
@@ -130,17 +131,17 @@ class LinkRouteTest(TestCase):
                    ('listener', {'host': '0.0.0.0', 'role': 'inter-router', 'port': c_listener_port, 'saslMechanisms': 'ANONYMOUS'}),
                    # The dot(.) at the end is ignored by the address hashing scheme.
 
-                   ('linkRoute', {'prefix': 'org.apache.', 'dir': 'in'}),
-                   ('linkRoute', {'prefix': 'org.apache.', 'dir': 'out'}),
+                   ('linkRoute', {'prefix': 'org.apache.', 'direction': 'in'}),
+                   ('linkRoute', {'prefix': 'org.apache.', 'direction': 'out'}),
 
-                   ('linkRoute', {'prefix': 'pulp.task', 'dir': 'in'}),
-                   ('linkRoute', {'prefix': 'pulp.task', 'dir': 'out'}),
+                   ('linkRoute', {'prefix': 'pulp.task', 'direction': 'in'}),
+                   ('linkRoute', {'prefix': 'pulp.task', 'direction': 'out'}),
 
-                   ('linkRoute', {'pattern': 'a.*.toA.#', 'dir': 'in'}),
-                   ('linkRoute', {'pattern': 'a.*.toA.#', 'dir': 'out'}),
+                   ('linkRoute', {'pattern': 'a.*.toA.#', 'direction': 'in'}),
+                   ('linkRoute', {'pattern': 'a.*.toA.#', 'direction': 'out'}),
 
-                   ('linkRoute', {'pattern': 'a.*.toD.#', 'dir': 'in'}),
-                   ('linkRoute', {'pattern': 'a.*.toD.#', 'dir': 'out'})
+                   ('linkRoute', {'pattern': 'a.*.toD.#', 'direction': 'in'}),
+                   ('linkRoute', {'pattern': 'a.*.toD.#', 'direction': 'out'})
 
                 ]
                )
@@ -191,8 +192,8 @@ class LinkRouteTest(TestCase):
         out = self.run_qdmanage(cmd=cmd, address=self.routers[1].addresses[0])
 
         # Make sure there is a dir of in and out.
-        self.assertTrue('"dir": "in"' in out)
-        self.assertTrue('"dir": "out"' in out)
+        self.assertTrue('"direction": "in"' in out)
+        self.assertTrue('"direction": "out"' in out)
         self.assertTrue('"containerId": "QDR.A"' in out)
 
         # Use the long type and make sure that qdmanage does not mess up the long type
@@ -200,8 +201,8 @@ class LinkRouteTest(TestCase):
         out = self.run_qdmanage(cmd=cmd, address=self.routers[1].addresses[0])
 
         # Make sure there is a dir of in and out.
-        self.assertTrue('"dir": "in"' in out)
-        self.assertTrue('"dir": "out"' in out)
+        self.assertTrue('"direction": "in"' in out)
+        self.assertTrue('"direction": "out"' in out)
         self.assertTrue('"containerId": "QDR.A"' in out)
 
         identity = out[out.find("identity") + 12: out.find("identity") + 13]
@@ -231,7 +232,7 @@ class LinkRouteTest(TestCase):
 
         self.assertTrue(exception_occurred)
 
-        cmd = 'CREATE --type=autoLink addr=127.0.0.1 dir=in connection=routerC'
+        cmd = 'CREATE --type=autoLink addr=127.0.0.1 direction=in connection=routerC'
         out = self.run_qdmanage(cmd=cmd, address=self.routers[1].addresses[0])
 
         identity = out[out.find("identity") + 12: out.find("identity") + 14]
@@ -577,11 +578,15 @@ class LinkRouteTest(TestCase):
         We are deleting the link route using qdmanage short name. This should be the last test to run
         """
 
-        # First delete linkRoutes on QDR.B
         local_node = Node.connect(self.routers[1].addresses[0], timeout=TIMEOUT)
-        result_list = local_node.query(type='org.apache.qpid.dispatch.router.config.linkRoute').results
-        self.assertEqual(8, len(result_list))
+        res = local_node.query(type='org.apache.qpid.dispatch.routerStats')
+        results = res.results[0]
+        attribute_list = res.attribute_names
 
+        result_list = local_node.query(type='org.apache.qpid.dispatch.router.config.linkRoute').results
+        self.assertEqual(results[attribute_list.index('linkRouteCount')], len(result_list))
+
+        # First delete linkRoutes on QDR.B
         for rid in range(8):
             cmd = 'DELETE --type=linkRoute --identity=' + result_list[rid][1]
             self.run_qdmanage(cmd=cmd, address=self.routers[1].addresses[0])
@@ -611,6 +616,11 @@ class LinkRouteTest(TestCase):
         cmd = 'QUERY --type=linkRoute'
         out = self.run_qdmanage(cmd=cmd, address=addr)
         self.assertEquals(out.rstrip(), '[]')
+
+        res = local_node.query(type='org.apache.qpid.dispatch.routerStats')
+        results = res.results[0]
+        attribute_list = res.attribute_names
+        self.assertEqual(results[attribute_list.index('linkRouteCount')], 0)
 
         blocking_connection = BlockingConnection(addr, timeout=3)
 

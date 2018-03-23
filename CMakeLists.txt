@@ -37,7 +37,7 @@ option(QD_MEMORY_STATS "Track memory pool usage statistics" ON)
 
 file(STRINGS "${CMAKE_SOURCE_DIR}/VERSION.txt" QPID_DISPATCH_VERSION)
 
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 2.6)
 include(CheckLibraryExists)
 include(CheckSymbolExists)
 include(CheckFunctionExists)
@@ -162,7 +162,7 @@ include_directories(
     )
 
 if (NOT CMAKE_SYSTEM_NAME STREQUAL SunOS)
- add_compile_options(-Werror)
+ #add_compile_options(-Werror)
  add_compile_options(-Wall)
  include(CheckCCompilerFlag)
  check_c_compiler_flag(-Wpedantic HAS_PEDANTIC_FLAG)

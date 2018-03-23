@@ -21,29 +21,8 @@
 #include <qpid/dispatch/amqp.h>
 #include <stdio.h>
 #include <strings.h>
+#include "forwarder.h"
 
-//
-// NOTE: If the in_delivery argument is NULL, the resulting out deliveries
-//       shall be pre-settled.
-//
-typedef int (*qdr_forward_message_t) (qdr_core_t      *core,
-                                      qdr_address_t   *addr,
-                                      qd_message_t    *msg,
-                                      qdr_delivery_t  *in_delivery,
-                                      bool             exclude_inprocess,
-                                      bool             control);
-
-typedef bool (*qdr_forward_attach_t) (qdr_core_t     *core,
-                                      qdr_address_t  *addr,
-                                      qdr_link_t     *link,
-                                      qdr_terminus_t *source,
-                                      qdr_terminus_t *target);
-
-struct qdr_forwarder_t {
-    qdr_forward_message_t forward_message;
-    qdr_forward_attach_t  forward_attach;
-    bool                  bypass_valid_origins;
-};
 
 //==================================================================================
 // Built-in Forwarders
@@ -113,6 +92,8 @@ qdr_delivery_t *qdr_forward_new_delivery_CT(qdr_core_t *core, qdr_delivery_t *in
     out_dlv->tag_length = 8;
     out_dlv->error      = 0;
 
+    out_dlv->ingress_index = in_dlv ? in_dlv->ingress_index : -1;
+
     //
     // Add one to the message fanout. This will later be used in the qd_message_send function that sends out messages.
     //
@@ -165,7 +146,7 @@ static void qdr_forward_drop_presettled_CT_LH(qdr_core_t *core, qdr_link_t *link
 
             // Increment the presettled_dropped_deliveries on the out_link
             link->dropped_presettled_deliveries++;
-
+            core->dropped_presettled_deliveries++;
         }
         dlv = next;
     }
@@ -279,8 +260,10 @@ int qdr_forward_multicast_CT(qdr_core_t      *core,
             qdr_delivery_t *out_delivery = qdr_forward_new_delivery_CT(core, in_delivery, out_link, msg);
             qdr_forward_deliver_CT(core, out_link, out_delivery);
             fanout++;
-            if (out_link->link_type != QD_LINK_CONTROL && out_link->link_type != QD_LINK_ROUTER)
+            if (out_link->link_type != QD_LINK_CONTROL && out_link->link_type != QD_LINK_ROUTER) {
                 addr->deliveries_egress++;
+                core->deliveries_egress++;
+            }
             link_ref = DEQ_NEXT(link_ref);
         }
     }
@@ -353,6 +336,7 @@ int qdr_forward_multicast_CT(qdr_core_t      *core,
                 qdr_forward_deliver_CT(core, dest_link, out_delivery);
                 fanout++;
                 addr->deliveries_transit++;
+                core->deliveries_transit++;
             }
         }
 
@@ -482,6 +466,13 @@ int qdr_forward_closest_CT(qdr_core_t      *core,
         }
 
         addr->deliveries_egress++;
+        core->deliveries_egress++;
+
+        if (qdr_connection_route_container(out_link->conn)) {
+            core->deliveries_egress_route_container++;
+            addr->deliveries_egress_route_container++;
+        }
+
         return 1;
     }
 
@@ -515,6 +506,7 @@ int qdr_forward_closest_CT(qdr_core_t      *core,
                 out_delivery = qdr_forward_new_delivery_CT(core, in_delivery, out_link, msg);
                 qdr_forward_deliver_CT(core, out_link, out_delivery);
                 addr->deliveries_transit++;
+                core->deliveries_transit++;
                 return 1;
             }
         }
@@ -674,10 +666,19 @@ int qdr_forward_balanced_CT(qdr_core_t      *core,
         //
         // Bump the appropriate counter based on where we sent the delivery.
         //
-        if (chosen_link_bit >= 0)
+        if (chosen_link_bit >= 0) {
             addr->deliveries_transit++;
-        else
+            core->deliveries_transit++;
+        }
+        else {
             addr->deliveries_egress++;
+            core->deliveries_egress++;
+
+            if (qdr_connection_route_container(chosen_link->conn)) {
+                core->deliveries_egress_route_container++;
+                addr->deliveries_egress_route_container++;
+            }
+        }
         return 1;
     }
 
@@ -828,11 +829,12 @@ qdr_forwarder_t *qdr_forwarder_CT(qdr_core_t *core, qd_address_treatment_t treat
 int qdr_forward_message_CT(qdr_core_t *core, qdr_address_t *addr, qd_message_t *msg, qdr_delivery_t *in_delivery,
                            bool exclude_inprocess, bool control)
 {
+    int fanout = 0;
     if (addr->forwarder)
-        return addr->forwarder->forward_message(core, addr, msg, in_delivery, exclude_inprocess, control);
+        fanout = addr->forwarder->forward_message(core, addr, msg, in_delivery, exclude_inprocess, control);
 
     // TODO - Deal with this delivery's disposition
-    return 0;
+    return fanout;
 }
 
 

@@ -47,8 +47,8 @@ class QdmanageTest(TestCase):
             ('listener', {'port': cls.tester.get_port()}),
             ('connector', {'role': 'inter-router', 'port': cls.inter_router_port}),
             ('address', {'name': 'test-address', 'prefix': 'abcd', 'distribution': 'multicast'}),
-            ('linkRoute', {'name': 'test-link-route', 'prefix': 'xyz', 'dir': 'in'}),
-            ('autoLink', {'name': 'test-auto-link', 'addr': 'mnop', 'dir': 'out'}),
+            ('linkRoute', {'name': 'test-link-route', 'prefix': 'xyz', 'direction': 'in'}),
+            ('autoLink', {'name': 'test-auto-link', 'addr': 'mnop', 'direction': 'out'}),
             ('listener', {'port': cls.tester.get_port(), 'sslProfile': 'server-ssl'}),
             ('address', {'name': 'pattern-address', 'pattern': 'a/*/b/#/c', 'distribution': 'closest'})
         ])
@@ -177,15 +177,19 @@ class QdmanageTest(TestCase):
 
     def test_get_types(self):
         out = json.loads(self.run_qdmanage("get-types"))
-        self.assertEqual(len(out), 26)
+        self.assertEqual(len(out), 29)
 
     def test_get_attributes(self):
         out = json.loads(self.run_qdmanage("get-attributes"))
-        self.assertEqual(len(out), 26)
+        self.assertEqual(len(out), 28)
+
+    def test_get_attributes(self):
+        out = json.loads(self.run_qdmanage("get-attributes"))
+        self.assertEqual(len(out), 29)
 
     def test_get_operations(self):
         out = json.loads(self.run_qdmanage("get-operations"))
-        self.assertEqual(len(out), 26)
+        self.assertEqual(len(out), 29)
         self.assertEqual(out['org.apache.qpid.dispatch.sslProfile'], [u'CREATE', u'DELETE', u'READ'])
 
     def test_get_types_with_ssl_profile_type(self):
@@ -296,12 +300,13 @@ class QdmanageTest(TestCase):
         query_command = 'QUERY --type=' + long_type
         output = json.loads(self.run_qdmanage(query_command))
         self.assertEqual(output[0]['name'], "test-link-route")
+        self.assertEqual(output[0]['direction'], "in")
         self.assertEqual(output[0]['dir'], "in")
         self.assertEqual(output[0]['prefix'], "xyz")
 
     def test_specify_container_id_connection_link_route(self):
         long_type = 'org.apache.qpid.dispatch.router.config.linkRoute'
-        create_command = 'CREATE --type=' + long_type + ' prefix=abc containerId=id1 connection=conn1 dir=out'
+        create_command = 'CREATE --type=' + long_type + ' prefix=abc containerId=id1 connection=conn1 direction=out'
         output = self.run_qdmanage(create_command, expect=Process.EXIT_FAIL)
         self.assertIn("Both connection and containerId cannot be specified", output)
 
@@ -310,18 +315,33 @@ class QdmanageTest(TestCase):
         query_command = 'QUERY --type=' + long_type
         output = json.loads(self.run_qdmanage(query_command))
         self.assertEqual(output[0]['name'], "test-auto-link")
-        self.assertEqual(output[0]['dir'], "out")
+        self.assertEqual(output[0]['direction'], "out")
         self.assertEqual(output[0]['addr'], "mnop")
 
     def test_create_auto_link_with_phase(self):
         long_type = 'org.apache.qpid.dispatch.router.config.autoLink'
-        create_command = 'CREATE --type=' + long_type + ' addr=xyz containerId=id1 dir=out phase=2'
+        create_command = 'CREATE --type=' + long_type + ' addr=xyz containerId=id1 direction=out phase=2'
         output = json.loads(self.run_qdmanage(create_command))
         self.assertEqual(output['phase'], 2)
 
+    def test_create_auto_link_with_dir(self):
+        long_type = 'org.apache.qpid.dispatch.router.config.autoLink'
+        create_command = 'CREATE --type=' + long_type + ' addr=defgh containerId=id2 dir=out phase=2'
+        output = json.loads(self.run_qdmanage(create_command))
+        self.assertEqual(output['dir'], 'out')
+        self.assertEqual(output['direction'], 'out')
+
+    def test_create_link_route_with_dir(self):
+        long_type = 'org.apache.qpid.dispatch.router.config.linkRoute'
+        create_command = 'CREATE --type=' + long_type + ' pattern=mnb dir=out'
+        output = json.loads(self.run_qdmanage(create_command))
+        self.assertEqual(output['dir'], 'out')
+        self.assertEqual(output['direction'], 'out')
+
+
     def test_specify_container_id_connection_auto_link(self):
         long_type = 'org.apache.qpid.dispatch.router.config.autoLink'
-        create_command = 'CREATE --type=' + long_type + ' addr=abc containerId=id1 connection=conn1 dir=out'
+        create_command = 'CREATE --type=' + long_type + ' addr=abc containerId=id1 connection=conn1 direction=out'
         output = self.run_qdmanage(create_command, expect=Process.EXIT_FAIL)
         self.assertIn("Both connection and containerId cannot be specified", output)
 

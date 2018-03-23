@@ -18,12 +18,16 @@
 #
 
 import unittest2 as unittest
+import json
 from proton import Message
-from system_test import TestCase, Qdrouterd, main_module, TIMEOUT
+from system_test import TestCase, Qdrouterd, main_module, TIMEOUT, Process
 from proton.handlers import MessagingHandler
 from proton.reactor import Container
+from subprocess import PIPE, STDOUT
+from qpid_dispatch.management.client import Node
 
 CONNECTION_PROPERTIES = {u'connection': u'properties', u'int_property': 6451}
+
 
 class AutolinkTest(TestCase):
     """System tests involving a single router"""
@@ -53,17 +57,18 @@ class AutolinkTest(TestCase):
             #
             # Create a pair of default auto-links for 'node.1'
             #
-            ('autoLink', {'addr': 'node.1', 'containerId': 'container.1', 'dir': 'in'}),
-            ('autoLink', {'addr': 'node.1', 'containerId': 'container.1', 'dir': 'out'}),
+            ('autoLink', {'addr': 'node.1', 'containerId': 'container.1', 'direction': 'in'}),
+            ('autoLink', {'addr': 'node.1', 'containerId': 'container.1', 'direction': 'out'}),
 
             #
             # Create a pair of auto-links on non-default phases for container-to-container transfers
             #
-            ('autoLink', {'addr': 'xfer.2', 'containerId': 'container.2', 'dir': 'in',  'phase': '4'}),
-            ('autoLink', {'addr': 'xfer.2', 'containerId': 'container.3', 'dir': 'out', 'phase': '4'}),
+            ('autoLink', {'addr': 'xfer.2', 'containerId': 'container.2', 'direction': 'in',  'phase': '4'}),
+            ('autoLink', {'addr': 'xfer.2', 'containerId': 'container.3', 'direction': 'out', 'phase': '4'}),
 
             #
             # Create a pair of auto-links with a different external address
+            # Leave the direction as dir to test backward compatibility.
             #
             ('autoLink', {'addr': 'node.2', 'externalAddr': 'ext.2', 'containerId': 'container.4', 'dir': 'in'}),
             ('autoLink', {'addr': 'node.2', 'externalAddr': 'ext.2', 'containerId': 'container.4', 'dir': 'out'}),
@@ -74,6 +79,26 @@ class AutolinkTest(TestCase):
         cls.normal_address = cls.router.addresses[0]
         cls.route_address  = cls.router.addresses[1]
 
+    def run_qdstat_general(self):
+        cmd = ['qdstat', '--bus', str(AutolinkTest.normal_address), '--timeout', str(TIMEOUT)] + ['-g']
+        p = self.popen(
+            cmd,
+            name='qdstat-'+self.id(), stdout=PIPE, expect=None)
+
+        out = p.communicate()[0]
+        assert p.returncode == 0, "qdstat exit status %s, output:\n%s" % (p.returncode, out)
+        return out
+
+    def run_qdmanage(self, cmd, input=None, expect=Process.EXIT_OK):
+        p = self.popen(
+            ['qdmanage'] + cmd.split(' ') + ['--bus', AutolinkTest.normal_address, '--indent=-1', '--timeout', str(TIMEOUT)],
+            stdin=PIPE, stdout=PIPE, stderr=STDOUT, expect=expect)
+        out = p.communicate(input)[0]
+        try:
+            p.teardown()
+        except Exception, e:
+            raise Exception("%s\n%s" % (e, out))
+        return out
 
     def test_01_autolink_attach(self):
         """
@@ -84,7 +109,6 @@ class AutolinkTest(TestCase):
         test.run()
         self.assertEqual(None, test.error)
 
-
     def test_02_autolink_credit(self):
         """
         Create a normal connection and a sender to the autolink address.  Then create the route-container
@@ -93,7 +117,7 @@ class AutolinkTest(TestCase):
         test = AutolinkCreditTest(self.normal_address, self.route_address)
         test.run()
         self.assertEqual(None, test.error)
-
+        self.assertTrue(test.autolink_count_ok)
 
     def test_03_autolink_sender(self):
         """
@@ -104,6 +128,15 @@ class AutolinkTest(TestCase):
         test.run()
         self.assertEqual(None, test.error)
 
+        long_type = 'org.apache.qpid.dispatch.routerStats'
+        query_command = 'QUERY --type=' + long_type
+        output = json.loads(self.run_qdmanage(query_command))
+        self.assertEqual(output[0]['deliveriesEgressRouteContainer'], 275)
+        self.assertEqual(output[0]['deliveriesIngressRouteContainer'], 0)
+        self.assertEqual(output[0]['deliveriesTransit'], 0)
+
+        self.assertEqual(output[0]['deliveriesIngress'], 277)
+        self.assertEqual(output[0]['deliveriesEgress'], 276)
 
     def test_04_autolink_receiver(self):
         """
@@ -114,6 +147,15 @@ class AutolinkTest(TestCase):
         test.run()
         self.assertEqual(None, test.error)
 
+        long_type = 'org.apache.qpid.dispatch.routerStats'
+        query_command = 'QUERY --type=' + long_type
+        output = json.loads(self.run_qdmanage(query_command))
+        self.assertEqual(output[0]['deliveriesEgressRouteContainer'], 275)
+        self.assertEqual(output[0]['deliveriesIngressRouteContainer'], 275)
+        self.assertEqual(output[0]['deliveriesTransit'], 0)
+
+        self.assertEqual(output[0]['deliveriesIngress'], 553)
+        self.assertEqual(output[0]['deliveriesEgress'], 552)
 
     def test_05_inter_container_transfer(self):
         """
@@ -234,6 +276,7 @@ class AutolinkCreditTest(MessagingHandler):
         self.route_conn     = None
         self.error          = None
         self.last_action    = "None"
+        self.autolink_count_ok = False
 
     def timeout(self):
         self.error = "Timeout Expired: last_action=%s" % self.last_action
@@ -247,6 +290,13 @@ class AutolinkCreditTest(MessagingHandler):
         self.normal_conn = event.container.connect(self.normal_address)
         self.sender      = event.container.create_sender(self.normal_conn, self.dest)
         self.last_action = "Attached normal sender"
+
+        local_node = Node.connect(self.normal_address, timeout=TIMEOUT)
+        res = local_node.query(type='org.apache.qpid.dispatch.routerStats')
+        results = res.results[0]
+        attribute_names = res.attribute_names
+        if 6 == results[attribute_names.index('autoLinkCount')]:
+            self.autolink_count_ok = True
 
     def on_link_opening(self, event):
         if event.sender:
@@ -517,7 +567,7 @@ class ManageAutolinksTest(MessagingHandler):
                 props = {'operation': 'CREATE',
                          'type': 'org.apache.qpid.dispatch.router.config.autoLink',
                          'name': 'AL.%d' % self.n_created }
-                body  = {'dir': 'out',
+                body  = {'direction': 'out',
                          'containerId': 'container.new',
                          'addr': 'node.%d' % self.n_created }
                 msg = Message(properties=props, body=body, reply_to=self.reply_to)

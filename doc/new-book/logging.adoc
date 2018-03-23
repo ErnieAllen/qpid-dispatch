@@ -17,14 +17,14 @@ specific language governing permissions and limitations
 under the License
 ////
 
-[[logging]]
+[id='logging']
 = Logging
 
 Logging enables you to diagnose error and performance issues with {RouterName}.
 
 {RouterName} consists of internal modules that provide important information about the router. For each module, you can specify logging levels, the format of the log file, and the location to which the logs should be written.
 
-[[logging_modules_you_can_configure]]
+[id='logging-modules-you-can-configure']
 == Logging Modules
 
 {RouterName} logs are broken into different categories called _logging modules_. Each module provides important information about a particular aspect of {RouterName}.
@@ -202,10 +202,10 @@ In this example, on `Router.A`, `address`, `linkRoute`, and `autoLink` entities 
 Tue Jun  7 15:07:32 2016 AGENT (debug) Add entity: ConnectorEntity(addr=127.0.0.1, allowRedirect=True, cost=1, host=127.0.0.1, identity=connector/127.0.0.1:5672:BROKER, idleTimeoutSeconds=16, maxFrameSize=65536, name=BROKER, port=5672, role=route-container, stripAnnotations=both, type=org.apache.qpid.dispatch.connector, verifyHostName=True)
 Tue Jun  7 15:07:32 2016 AGENT (debug) Add entity: RouterConfigAddressEntity(distribution=closest, identity=router.config.address/0, name=router.config.address/0, prefix=my_address, type=org.apache.qpid.dispatch.router.config.address, waypoint=False)
 Tue Jun  7 15:07:32 2016 AGENT (debug) Add entity: RouterConfigAddressEntity(distribution=balanced, identity=router.config.address/1, name=router.config.address/1, prefix=my_queue_wp, type=org.apache.qpid.dispatch.router.config.address, waypoint=True)
-Tue Jun  7 15:07:32 2016 AGENT (debug) Add entity: RouterConfigLinkrouteEntity(connection=BROKER, dir=in, distribution=linkBalanced, identity=router.config.linkRoute/0, name=router.config.linkRoute/0, prefix=my_queue, type=org.apache.qpid.dispatch.router.config.linkRoute)
-Tue Jun  7 15:07:32 2016 AGENT (debug) Add entity: RouterConfigLinkrouteEntity(connection=BROKER, dir=out, distribution=linkBalanced, identity=router.config.linkRoute/1, name=router.config.linkRoute/1, prefix=my_queue, type=org.apache.qpid.dispatch.router.config.linkRoute)
-Tue Jun  7 15:07:32 2016 AGENT (debug) Add entity: RouterConfigAutolinkEntity(addr=my_queue_wp, connection=BROKER, dir=in, identity=router.config.autoLink/0, name=router.config.autoLink/0, type=org.apache.qpid.dispatch.router.config.autoLink)
-Tue Jun  7 15:07:32 2016 AGENT (debug) Add entity: RouterConfigAutolinkEntity(addr=my_queue_wp, connection=BROKER, dir=out, identity=router.config.autoLink/1, name=router.config.autoLink/1, type=org.apache.qpid.dispatch.router.config.autoLink)
+Tue Jun  7 15:07:32 2016 AGENT (debug) Add entity: RouterConfigLinkrouteEntity(connection=BROKER, direction=in, distribution=linkBalanced, identity=router.config.linkRoute/0, name=router.config.linkRoute/0, prefix=my_queue, type=org.apache.qpid.dispatch.router.config.linkRoute)
+Tue Jun  7 15:07:32 2016 AGENT (debug) Add entity: RouterConfigLinkrouteEntity(connection=BROKER, direction=out, distribution=linkBalanced, identity=router.config.linkRoute/1, name=router.config.linkRoute/1, prefix=my_queue, type=org.apache.qpid.dispatch.router.config.linkRoute)
+Tue Jun  7 15:07:32 2016 AGENT (debug) Add entity: RouterConfigAutolinkEntity(addr=my_queue_wp, connection=BROKER, direction=in, identity=router.config.autoLink/0, name=router.config.autoLink/0, type=org.apache.qpid.dispatch.router.config.autoLink)
+Tue Jun  7 15:07:32 2016 AGENT (debug) Add entity: RouterConfigAutolinkEntity(addr=my_queue_wp, connection=BROKER, direction=out, identity=router.config.autoLink/1, name=router.config.autoLink/1, type=org.apache.qpid.dispatch.router.config.autoLink)
 ----
 
 === The `CONTAINER` Logging Module
@@ -254,7 +254,7 @@ Tue Jun  7 15:07:32 2016 POLICY (info) Policy configured maximumConnections: 0, 
 Tue Jun  7 15:07:32 2016 POLICY (info) Policy fallback defaultApplication is disabled
 ----
 
-[[configure_default_logging]]
+[id='configure-default-logging']
 == Configuring Logging
 
 You can specify the types of events that should be logged, the format of the log entries, and where those entries should be sent.
@@ -291,7 +291,7 @@ To specify multiple levels, use a comma-separated list. You can also use `+` to 
 //end::logging-levels[]
 `timestamp`:: Set this to `yes` to include the timestamp in all logs.
 
-For information about additional log attributes, see xref:router_configuration_file_log[Log] in the _Configuration Reference_.
+For information about additional log attributes, see xref:router-configuration-file-log[Log] in the _Configuration Reference_.
 --
 
 . Add an additional `log` section for each logging module that should not follow the default logging configuration:
@@ -307,12 +307,12 @@ log {
 }
 ----
 
-`module`:: The name of the module for which you are configuring logging. For a list of valid modules, see xref:logging_modules_you_can_configure[Logging Modules You Can Configure].
+`module`:: The name of the module for which you are configuring logging. For a list of valid modules, see xref:logging-modules-you-can-configure[].
 `enable`:: The logging level. You can specify any of the following levels (from lowest to highest):
 +
 include::logging.adoc[tags=logging-levels]
 
-For information about additional log attributes, see xref:router_configuration_file_log[Log] in the _Configuration Reference_.
+For information about additional log attributes, see xref:router-configuration-file-log[Log] in the _Configuration Reference_.
 --
 
 == Viewing Log Entries

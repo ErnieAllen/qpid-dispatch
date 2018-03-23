@@ -18,6 +18,7 @@
  */
 
 #include "router_core_private.h"
+#include "exchange_bindings.h"
 #include <qpid/dispatch/amqp.h>
 #include <stdio.h>
 #include <inttypes.h>
@@ -42,7 +43,7 @@ void qdr_delivery_copy_extension_state(qdr_delivery_t *src, qdr_delivery_t *dest
 //==================================================================================
 
 qdr_delivery_t *qdr_link_deliver(qdr_link_t *link, qd_message_t *msg, qd_iterator_t *ingress,
-                                 bool settled, qd_bitmask_t *link_exclusion)
+                                 bool settled, qd_bitmask_t *link_exclusion, int ingress_index)
 {
     qdr_action_t   *action = qdr_action(qdr_link_deliver_CT, "link_deliver");
     qdr_delivery_t *dlv    = new_qdr_delivery_t();
@@ -55,6 +56,7 @@ qdr_delivery_t *qdr_link_deliver(qdr_link_t *link, qd_message_t *msg, qd_iterato
     dlv->settled        = settled;
     dlv->presettled     = settled;
     dlv->link_exclusion = link_exclusion;
+    dlv->ingress_index  = ingress_index;
     dlv->error          = 0;
 
     qdr_delivery_incref(dlv, "qdr_link_deliver - newly created delivery, add to action list");
@@ -68,7 +70,7 @@ qdr_delivery_t *qdr_link_deliver(qdr_link_t *link, qd_message_t *msg, qd_iterato
 
 qdr_delivery_t *qdr_link_deliver_to(qdr_link_t *link, qd_message_t *msg,
                                     qd_iterator_t *ingress, qd_iterator_t *addr,
-                                    bool settled, qd_bitmask_t *link_exclusion)
+                                    bool settled, qd_bitmask_t *link_exclusion, int ingress_index)
 {
     qdr_action_t   *action = qdr_action(qdr_link_deliver_CT, "link_deliver");
     qdr_delivery_t *dlv    = new_qdr_delivery_t();
@@ -81,6 +83,7 @@ qdr_delivery_t *qdr_link_deliver_to(qdr_link_t *link, qd_message_t *msg,
     dlv->settled        = settled;
     dlv->presettled     = settled;
     dlv->link_exclusion = link_exclusion;
+    dlv->ingress_index  = ingress_index;
     dlv->error          = 0;
 
     qdr_delivery_incref(dlv, "qdr_link_deliver_to - newly created delivery, add to action list");
@@ -520,17 +523,34 @@ static void qdr_delete_delivery_internal_CT(qdr_core_t *core, qdr_delivery_t *de
     }
 
     if (link) {
-        if (delivery->presettled)
+        if (delivery->presettled) {
             link->presettled_deliveries++;
-        else if (delivery->disposition == PN_ACCEPTED)
+            if (link->link_direction ==  QD_INCOMING)
+                core->presettled_deliveries++;
+        }
+        else if (delivery->disposition == PN_ACCEPTED) {
             link->accepted_deliveries++;
-        else if (delivery->disposition == PN_REJECTED)
+            if (link->link_direction ==  QD_INCOMING)
+                core->accepted_deliveries++;
+        }
+        else if (delivery->disposition == PN_REJECTED) {
             link->rejected_deliveries++;
-        else if (delivery->disposition == PN_RELEASED)
+            if (link->link_direction ==  QD_INCOMING)
+                core->rejected_deliveries++;
+        }
+        else if (delivery->disposition == PN_RELEASED) {
             link->released_deliveries++;
-        else if (delivery->disposition == PN_MODIFIED)
+            if (link->link_direction ==  QD_INCOMING)
+                core->released_deliveries++;
+        }
+        else if (delivery->disposition == PN_MODIFIED) {
             link->modified_deliveries++;
-    }
+            if (link->link_direction ==  QD_INCOMING)
+                core->modified_deliveries++;
+        }
+
+        if (qd_bitmask_valid_bit_value(delivery->ingress_index) && link->ingress_histogram)
+            link->ingress_histogram[delivery->ingress_index]++;    }
 
     //
     // Free all the peer qdr_delivery_ref_t references
@@ -757,13 +777,19 @@ static void qdr_link_flow_CT(qdr_core_t *core, qdr_action_t *action, bool discar
  */
 static long qdr_addr_path_count_CT(qdr_address_t *addr)
 {
-    return (long) DEQ_SIZE(addr->subscriptions) + (long) DEQ_SIZE(addr->rlinks) +
-        (long) qd_bitmask_cardinality(addr->rnodes);
+    long rc = ((long) DEQ_SIZE(addr->subscriptions)
+               + (long) DEQ_SIZE(addr->rlinks)
+               + (long) qd_bitmask_cardinality(addr->rnodes));
+    if (addr->exchange)
+        rc += qdr_exchange_binding_count(addr->exchange)
+            + ((qdr_exchange_alternate_addr(addr->exchange)) ? 1 : 0);
+    return rc;
 }
 
 
 static void qdr_link_forward_CT(qdr_core_t *core, qdr_link_t *link, qdr_delivery_t *dlv, qdr_address_t *addr)
 {
+    core->deliveries_ingress++;
     bool receive_complete = qd_message_receive_complete(qdr_delivery_message(dlv));
     if (addr && addr == link->owning_addr && qdr_addr_path_count_CT(addr) == 0) {
         //
@@ -787,6 +813,7 @@ static void qdr_link_forward_CT(qdr_core_t *core, qdr_link_t *link, qdr_delivery
             if (dlv->settled) {
                 // Increment the presettled_dropped_deliveries on the in_link
                 link->dropped_presettled_deliveries++;
+                core->dropped_presettled_deliveries++;
             }
         }
         else {
@@ -801,8 +828,16 @@ static void qdr_link_forward_CT(qdr_core_t *core, qdr_link_t *link, qdr_delivery
 
     if (addr) {
         fanout = qdr_forward_message_CT(core, addr, dlv->msg, dlv, false, link->link_type == QD_LINK_CONTROL);
-        if (link->link_type != QD_LINK_CONTROL && link->link_type != QD_LINK_ROUTER)
+        if (link->link_type != QD_LINK_CONTROL && link->link_type != QD_LINK_ROUTER) {
             addr->deliveries_ingress++;
+
+            if (qdr_connection_route_container(link->conn)) {
+                addr->deliveries_ingress_route_container++;
+                core->deliveries_ingress_route_container++;
+
+            }
+
+        }
         link->total_deliveries++;
     }
     //

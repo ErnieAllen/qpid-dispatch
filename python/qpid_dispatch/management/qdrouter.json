@@ -431,49 +431,16 @@
                     "description": "Time in seconds after which link state is declared stale if no RA is received.",
                     "create": true
                 },
-                "addrCount": {
-                    "type": "integer",
-                    "description":"Number of addresses known to the router.",
-                    "graph": true
-                },
-                "linkCount": {
-                    "type": "integer",
-                    "description":"Number of links attached to the router node.",
-                    "graph": true
-                },
-                "nodeCount": {
-                    "type": "integer",
-                    "description":"Number of known peer router nodes.",
-                    "graph": true
-                },
-                "linkRouteCount": {
-                    "type": "integer",
-                    "description":"Number of link routes attached to the router node.",
-                    "graph": true
-                },
-                "autoLinkCount": {
-                    "type": "integer",
-                    "description":"Number of auto links attached to the router node.",
-                    "graph": true
-                },
-                "connectionCount": {
-                    "type": "integer",
-                    "description":"Number of open connections to the router node.",
-                    "graph": true
-                },
-
                 "workerThreads": {
                     "type": "integer",
                     "default": 4,
                     "description": "The number of threads that will be created to process message traffic and other application work (timers, non-amqp file descriptors, etc.) .",
                     "create": true
-
                 },
                 "debugDump": {
                     "type": "path",
-                    "description": "A file to dump debugging information that can't be logged normally.",
+                    "description": "The absolute path to the location for the debug dump file. The router writes debug-level information to this file if the logger is not available.",
                     "create": true
-
                 },
                 "saslConfigPath": {
                     "type": "path",
@@ -488,6 +455,13 @@
                     "required": false,
                     "create": true
                 },
+                "allowResumableLinkRoute": {
+                    "type": "boolean",
+                    "description": "Whether links can be routed where timeout is non-zero or expiry-policy is not link-detach",
+                    "create": true,
+                    "required": false,
+                    "default": true
+                },                
                 "allowUnsettledMulticast": {
                     "type": "boolean",
                     "description": "If true, allow senders to send unsettled deliveries to multicast addresses.  These deliveries shall be settled by the ingress router.  If false, unsettled deliveries to multicast addresses shall be rejected.",
@@ -504,7 +478,115 @@
                 }
             }
         },
-
+        
+        "routerStats": {
+            "description": "Overall router statistics.",
+            "extends": "operationalEntity",
+            "attributes": {
+	            "id": {
+	                "description":"Router's unique identity. The router will fail to start without id.",
+	                "type": "string",
+	                "required": false
+	            },
+	            "mode": {
+	                "type": [
+	                    "standalone",
+	                    "interior"
+	                ],
+	                "default": "standalone",
+	                "description": "In standalone mode, the router operates as a single component.  It does not participate in the routing protocol and therefore will not cooperate with other routers. In interior mode, the router operates in cooperation with other interior routers in an interconnected network."
+	            },
+	            "version": {
+	                "type": "string",
+	                "description": "Software Version"
+	            },
+	            "addrCount": {
+	                "type": "integer",
+	                "description":"Number of addresses known to the router.",
+	                "graph": true
+	            },
+	            "linkCount": {
+	                "type": "integer",
+	                "description":"Number of links attached to the router node.",
+	                "graph": true
+	            },
+	            "nodeCount": {
+	                "type": "integer",
+	                "description":"Number of known peer router nodes.",
+	                "graph": true
+	            },
+	            "linkRouteCount": {
+	                "type": "integer",
+	                "description":"Number of link routes attached to the router node.",
+	                "graph": true
+	            },
+	            "autoLinkCount": {
+	                "type": "integer",
+	                "description":"Number of auto links attached to the router node.",
+	                "graph": true
+	            },
+	            "connectionCount": {
+	                "type": "integer",
+	                "description":"Number of open connections to the router node.",
+	                "graph": true
+	            },
+                "presettledDeliveries": {
+                    "type": "integer",
+                    "description":"Number of presettled deliveries handled by the router.",
+                    "graph": true
+                },
+                "droppedPresettledDeliveries": {
+                    "type": "integer",
+                    "description":"Number of presettled deliveries that were dropped by the router.",
+                    "graph": true
+                },
+                "acceptedDeliveries": {
+                    "type": "integer",
+                    "description":"Number of deliveries whose delivery state was set to ACCEPTED by the router. These deliveries were successfully processed by the router.",
+                    "graph": true
+                },
+                "rejectedDeliveries": {
+                    "type": "integer",
+                    "description":"Number of deliveries whose delivery state was set to REJECTED by the router. These deliveries were Invalid and unprocessable.",
+                    "graph": true
+                },
+                "releasedDeliveries": {
+                    "type": "integer",
+                    "description":"Number of deliveries whose delivery state was set to RELEASED by the router. These deliveries was not (and will not be) processed",
+                    "graph": true
+                },
+                "modifiedDeliveries": {
+                    "type": "integer",
+                    "description":"Number of deliveries whose delivery state was set to MODIFIED by the router. These deliveries were modified but not processed.",
+                    "graph": true
+                },
+                "deliveriesIngress": {
+                    "type": "integer",
+                    "description":"Number of deliveries that were sent to it by a sender that is directly attached to the router.",
+                    "graph": true
+                },
+                "deliveriesEgress": {
+                    "type": "integer",
+                    "description":"Number of deliveries that were sent by the router to a receiver that is directly attached to the router.",
+                    "graph": true
+                },
+                "deliveriesTransit": {
+                    "type": "integer",
+                    "description":"Number of deliveries that were sent to another router in the network.",
+                    "graph": true
+                },                
+                "deliveriesIngressRouteContainer": {
+                    "type": "integer",
+                    "description":"Number of deliveries that were received from router container connections.",
+                    "graph": true
+                },                
+                "deliveriesEgressRouteContainer": {
+                    "type": "integer",
+                    "description":"Number of deliveries that were sent to route container connections.",
+                    "graph": true
+                }                
+            }        
+        },        
         "sslProfile": {
             "description":"Attributes for setting TLS/SSL configuration for connections.",
             "referential": true,
@@ -602,7 +684,7 @@
                     "create": true
                 },
                 "port": {
-                    "description": "Port number or symbolic service name.",
+                    "description": "Port number or symbolic service name.  If '0', the router shall assign an ephemeral port to the listener and log the port number with a log of the form 'SERVER (notice) Listening on <host>:<assigned-port> (<listener-name>)'",
                     "type": "string",
                     "default": "amqp",
                     "create": true
@@ -1053,10 +1135,11 @@
                     "required": false,
                     "default": "linkBalanced"
                 },
-                "dir": {
+                "direction": {
                     "type": ["in", "out"],
                     "description": "The permitted direction of links: 'in' means client senders; 'out' means client receivers",
                     "create": true,
+                    "deprecationName": "dir",
                     "required": true
                 },
                 "operStatus": {
@@ -1078,10 +1161,11 @@
                     "create": true,
                     "required": true
                 },
-                "dir": {
+                "direction": {
                     "type": ["in", "out"],
                     "description": "The direction of the link to be created.  In means into the router, out means out of the router.",
                     "create": true,
+                    "deprecationName": "dir",
                     "required": true
                 },
                 "phase": {
@@ -1122,6 +1206,106 @@
                     "type": "string",
                     "description": "The error description from the last attach failure",
                     "create": false
+                }
+            }
+        },
+
+        "router.config.exchange": {
+            "description":"[EXPERIMENTAL] Defines a topic exchange.",
+            "extends": "configurationEntity",
+            "operations": ["CREATE", "DELETE"],
+            "attributes": {
+                "address": {
+                    "description": "The address of the exchange. Used by the message publisher as the target for sending messages.",
+                    "type": "string",
+                    "create": true,
+                    "required": true
+                },
+                "phase": {
+                    "type": "integer",
+                    "description": "The address phase for the exchange.  Defaults to '0'.",
+                    "create": true,
+                    "required": false
+                },
+                "alternateAddress": {
+                    "description": "The address to forward the message to if no bindings are matched.",
+                    "type": "string",
+                    "create": true,
+                    "required": false
+                },
+                "alternatePhase": {
+                    "type": "integer",
+                    "description": "The address phase for the alternateAddress.  Defaults to '0'.",
+                    "create": true,
+                    "required": false
+                },
+                "matchMethod": {
+                    "description": "Key matching algorithm used. 'amqp' uses the legacy AMQP topic exchange wildcard match method as described in the pre-1.0 drafts. 'mqtt' uses the MQTT topic filter wildcard match method.",
+                    "type": ["amqp", "mqtt"],
+                    "default": "amqp",
+                    "required": false,
+                    "create": true
+                },
+                "bindingCount": {
+                    "description": "The number of bindings associated with this exchange.",
+                    "type": "integer",
+                    "create": false
+                },
+                "receivedCount": {
+                    "description": "The total number of deliveries received by this exchange.",
+                    "type": "integer",
+                    "create": false
+                },
+                "droppedCount": {
+                    "description": "The total number of deliveries dropped due to the lack of an outgoing subscription.",
+                    "type": "integer",
+                    "create": false
+                },
+                "forwardedCount": {
+                    "description": "The total number of deliveries forwarded via matched bindings or to the alternateAddress",
+                    "type": "integer",
+                    "create": false
+                },
+                "divertedCount": {
+                    "description": "A count of those deliveries that were forwarded via the alternateAddress only.  This is a subset of the forwardedCount.",
+                    "type": "integer",
+                    "create": false
+                }
+            }
+        },
+
+        "router.config.binding": {
+            "description":"[EXPERIMENTAL] Defines a keyed next hop binding for a topic exchange. The subject field of the messages arriving at the exchange is compared against the binding's key value using the exchange's matchMethod.  If the subject matches the key the message is forwarded to the nextHopAddress. The nextHopAddress overrides the message's original destination.",
+            "extends": "configurationEntity",
+            "operations": ["CREATE", "DELETE"],
+            "attributes": {
+                "exchangeName": {
+                    "description": "The name of the exchange to bind.",
+                    "type": "string",
+                    "create": true,
+                    "required": true
+                },
+                "bindingKey": {
+                    "description": "Pattern to compare against incoming message's subject.  The key is a string of zero or more tokens and wildcards. The format depends on the matchMethod configured for the exchange. For AMQP each token is delimited by the '.' character and wild-card tokens '*' matches a single token and '#' matches zero or more tokens. For MQTT each token is delimited by the '/' character and wildcard tokens '+' matches a single token and '#' matches zero or more tokens at the end of the topic. If a key is not provided the binding will match all messages arriving at the exchange (fanout behavior).",
+                    "type": "string",
+                    "create": true,
+                    "required": false
+                },
+                "nextHopAddress": {
+                    "description": "The address to forward the message to when the message's topic string matches the binding key pattern.  This address is used by message consumers as the source of incoming messages.",
+                    "type": "string",
+                    "create": true,
+                    "required": true
+                },
+                "nextHopPhase": {
+                    "type": "integer",
+                    "description": "The address phase used when forwarding messages that match this binding.",
+                    "create": true,
+                    "required": false
+                },
+                "matchedCount": {
+                    "description": "Total number of deliveries that matched this binding.",
+                    "type": "integer"
                 }
             }
         },
@@ -1207,6 +1391,10 @@
                     "type": "integer",
                     "graph": true,
                     "description": "The total number of modified deliveries."
+                },
+                "ingressHistogram": {
+                    "type": "list",
+                    "description": "For outgoing links on connections with 'normal' role.  This histogram shows the number of settled deliveries on the link that ingressed the network at each interior router node."
                 }
             }
         },
@@ -1261,6 +1449,16 @@
                 "deliveriesFromContainer": {
                     "type": "integer",
                     "description": "The number of deliveries to this address that were originated from an in-process entity",
+                    "graph": true
+                },
+                "deliveriesIngressRouteContainer": {
+                    "type": "integer",
+                    "description": "Number of deliveries that were received from a route-container address.",
+                    "graph": true
+                },
+                "deliveriesEgressRouteContainer": {
+                    "type": "integer",
+                    "description": "Number of deliveries that were sent to a route-container address.",
                     "graph": true
                 },
                 "key": {
@@ -1325,6 +1523,10 @@
                 "lastTopoChange": {
                      "description": "Timestamp showing the most recent change to this node's neighborhood.",
                      "type": "integer"
+                },
+                "index": {
+                    "description": "Index number used in statistics histograms for this router node.  This index is specific to this router.",
+                    "type": "integer"
                 }
 
             }
@@ -1452,28 +1654,28 @@
                 "maxConnections": {
                     "type": "integer",
                     "default": 65535,
-                    "description": "Global maximum number of concurrent client connections allowed. This limit is always enforced even if no other policy settings have been defined.",
+                    "description": "The maximum number of concurrent client connections allowed for this router. This limit is always enforced, even if no other policy settings have been defined. The limit is applied to all incoming connections regardless of remote host, authenticated user, or targeted vhost.",
                     "required": false,
                     "create": true
                 },
                 "enableVhostPolicy": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Enable vhost policy user groups, connection denial, and resource limit enforcement",
+                    "description": "Enables the router to enforce the connection denials and resource limits defined in the configured vhost policies.",
                     "required": false,
                     "create": true
                 },
                 "policyDir": {
                     "type": "path",
                     "default": "",
-                    "description": "Absolute path to a directory that holds vhost definition .json files. All vhost definitions in all .json files in this directory are processed.",
+                    "description": "The absolute path to a directory that holds vhost policy definition files in JSON format (*.json). The router processes all of the vhost policies in each JSON file that is in this directory.",
                     "required": false,
                     "create": true
                 },
                 "defaultVhost": {
                     "type": "string",
                     "default": "$default",
-                    "description": "Vhost rule set name to use for connections with a vhost that is otherwise not defined. Default vhost processing may be disabled either by erasing the definition of defaultVhost or by not defining a vhost object named '$default'.",
+                    "description": "The name of the default vhost policy, which is applied to any connection for which a vhost policy has not been configured. If 'defaultVhost' is not defined, then default vhost processing is disabled.",
                     "required": false,
                     "create": true
                 },
@@ -1488,16 +1690,17 @@
             "extends": "configurationEntity",
             "operations": ["CREATE", "UPDATE", "DELETE"],
             "attributes": {
-                "id": {
+                "hostname": {
                     "type": "string",
-                    "description": "The vhost name.",
+                    "description": "The hostname of the vhost. This vhost policy will be applied to any client connection that is directed to this hostname.",
+                    "deprecationName": "id",
                     "required": true,
                     "create": true
                 },
                 "maxConnections": {
                     "type": "integer",
                     "default": 65535,
-                    "description": "Maximum number of concurrent client connections allowed.",
+                    "description": "The global maximum number of concurrent client connections allowed for this vhost.",
                     "required": false,
                     "create": true,
                     "update": true
@@ -1505,7 +1708,7 @@
                 "maxConnectionsPerUser": {
                     "type": "integer",
                     "default": 65535,
-                    "description": "Maximum number of concurrent client connections allowed for any single user.",
+                    "description": "The maximum number of concurrent client connections allowed for any user.",
                     "required": false,
                     "create": true,
                     "update": true
@@ -1513,14 +1716,14 @@
                 "maxConnectionsPerHost": {
                     "type": "integer",
                     "default": 65535,
-                    "description": "Maximum number of concurrent client connections allowed for any remote host.",
+                    "description": "The maximum number of concurrent client connections allowed for any remote host (the host from which the client is connecting).",
                     "required": false,
                     "create": true,
                     "update": true
                 },
                 "allowUnknownUser": {
                     "type": "boolean",
-                    "description": "Unrestricted users, those who are not members of a defined user group, are allowed to connect to this application. Unrestricted users are assigned to the 'default' user group and receive 'default' settings.",
+                    "description": "Whether unknown users (users who are not members of a defined user group) are allowed to connect to the vhost. Unknown users are assigned to the '$default' user group and receive '$default' settings.",
                     "default": false,
                     "required": false,
                     "create": true,
@@ -1542,79 +1745,79 @@
             "attributes": {
                 "users": {
                     "type": "string",
-                    "description": "CSV string or list of authenticated user names. A user may belong to one vhost user group only.",
+                    "description": "A list of authenticated users for this user group. Use commas to separate multiple users. A user may belong to only one vhost user group.",
                     "required": true
                 },
                 "remoteHosts": {
                     "type": "string",
-                    "description": "CSV string of numeric host IP addresses or address ranges from which the users may connect.",
+                    "description": "A list of remote hosts from which the users may connect. A host can be a hostname, IP address, or IP address range. Use commas to separate multiple hosts. To allow access from all remote hosts, specify a wildcard '*'. To deny access from all remote hosts, leave this attribute blank.",
                     "required": true
                 },
                 "maxFrameSize": {
                     "type": "integer",
-                    "description": "Largest frame that may be sent on this connection. Non-zero policy values overwrite values specified for a listener object. (AMQP Open, max-frame-size)",
+                    "description": "The largest frame, in bytes, that may be sent on this connection. Non-zero policy values overwrite values specified for a listener object (AMQP Open, max-frame-size).",
                     "default": 16384,
                     "required": false,
                     "create": true
                 },
                 "maxSessionWindow": {
                     "type": "integer",
-                    "description": "Largest incoming window in octets for sessions created on this connection. Non-zero policy values overwrite values specified for a listener object. (AMQP Begin, incoming-window)",
+                    "description": "The incoming capacity for new AMQP sessions, measured in octets. Non-zero policy values overwrite values specified for a listener object (AMQP Begin, incoming-window).",
                     "default": 1638400,
                     "required": false,
                     "create": true
                 },
                 "maxSessions": {
                     "type": "integer",
-                    "description": "Maximum number of sessions that may be created on this connection. Non-zero policy values overwrite values specified for a listener object. (AMQP Open, channel-max)",
+                    "description": "The maximum number of sessions that may be created on this connection. Non-zero policy values overwrite values specified for a listener object (AMQP Open, channel-max).",
                     "default": 32768,
                     "required": false,
                     "create": true
                 },
                 "maxSenders": {
                     "type": "integer",
-                    "description": "Maximum number of sending links that may be created on this connection. Zero disables all sender links.",
+                    "description": "The maximum number of sending links that may be created on this connection. A value of '0' disables all sender links.",
                     "default": 2147483647,
                     "required": false,
                     "create": true
                 },
                 "maxReceivers": {
                     "type": "integer",
-                    "description": "Maximum number of receiving links that may be created on this connection. Zero disables all receiver links.",
+                    "description": "The maximum number of receiving links that may be created on this connection. A value of '0' disables all receiver links.",
                     "default": 2147483647,
                     "required": false,
                     "create": true
                 },
                 "allowDynamicSource": {
                     "type": "boolean",
-                    "description": "This connection is allowed to use the Dynamic Link Source feature.",
+                    "description": "Whether this connection is allowed to create dynamic receiving links (links to resources that do not exist on the peer). A value of 'true' means that users are able to automatically create resources on the peer system.",
                     "default": false,
                     "required": false,
                     "create": true
                 },
                 "allowAnonymousSender": {
                     "type": "boolean",
-                    "description": "This connection is allowed to use the Anonymous Sender feature.",
+                    "description": "Whether this connection is allowed to create sending links if the sender does not provide a target address. By prohibiting anonymous senders, the router only needs to verify once, when the link is created, that the sender is permitted to send messages to the target address. The router does not need to verify each message that is sent on the link. A value of 'true' means that users may send messages to any address. Allowing anonymous senders can also decrease performance: if the sender does not specify a target address, then the router must parse each message to determine how to route it.",
                     "default": false,
                     "required": false,
                     "create": true
                 },
                 "allowUserIdProxy": {
                     "type": "boolean",
-                    "description": "This connection is allowed to send messages with a user_id property that differs from the connection authenticated user name.",
+                    "description": "Whether this connection is allowed to send messages with a user ID that is different than the connection's authenticated user name.",
                     "default": false,
                     "required": false,
                     "create": true
                 },
                 "sources": {
                     "type": "string",
-                    "description": "CSV list of Source addresses allowed when creating receiving links.",
+                    "description": "A list of source addresses from which users in this group may receive messages. To specify multiple addresses, separate the addresses with either a comma or a space. If you do not specify any addresses, users in this group are not allowed to receive messages from any addresses. You can use the substitution token '{user}' to specify an address that contains a user's authenticated user name. You can use an asterisk ('*') wildcard to match one or more characters in an address. However, this wildcard is only recognized if it is the last character in the address name.",
                     "required": false,
                     "create": true
                 },
                 "targets": {
                     "type": "string",
-                    "description": "CSV list of Target addresses allowed when creating sending links.",
+                    "description": "A list of target addresses from which users in this group may send messages. To specify multiple addresses, separate the addresses with either a comma or a space. If you do not specify any addresses, users in this group are not allowed to send messages from any addresses. You can use the substitution token '{user}' to specify an address that contains a user's authenticated user name. You can use an asterisk ('*') wildcard to match one or more characters in an address. However, this wildcard is only recognized if it is the last character in the address name.",
                     "required": false,
                     "create": true
                 }
@@ -1626,6 +1829,10 @@
             "extends": "operationalEntity",
             "attributes": {
                 "id": {
+                    "type": "string",
+                    "description": "The vhost name. DEPRECATED - use 'hostname' instead."
+                },
+                "hostname": {
                     "type": "string",
                     "description": "The vhost name."
                 },

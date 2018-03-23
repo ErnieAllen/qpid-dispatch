@@ -243,15 +243,11 @@ static void remote_sasl_free(pn_transport_t *transport)
             impl->downstream_released = true;
             if (impl->upstream_released) {
                 delete_qdr_sasl_relay_t(impl);
-            } else {
-                pn_connection_wake(impl->upstream);
             }
         } else {
             impl->upstream_released = true;
             if (impl->downstream_released) {
                 delete_qdr_sasl_relay_t(impl);
-            } else {
-                pn_connection_wake(impl->downstream);
             }
         }
     }
@@ -380,6 +376,8 @@ static void remote_sasl_process_outcome(pn_transport_t *transport)
             //only consider complete if failed; if successful wait for the open frame
             if (impl->outcome != PN_SASL_OK && !notify_upstream(impl, DOWNSTREAM_OUTCOME_RECEIVED)) {
                 pnx_sasl_set_desired_state(transport, SASL_ERROR);
+                pn_transport_close_tail(transport);
+                pn_transport_close_head(transport);
             }
         }
     }
@@ -633,8 +631,6 @@ void qdr_handle_authentication_service_connection_event(pn_event_t *e)
             allocate_buffer(&(context->permissions.targets));
             allocate_buffer(&(context->permissions.sources));
             parse_properties(properties, collect_permissions, (void*) &(context->permissions));
-            printf("allowed sources %s\n", context->permissions.sources.start);
-            printf("allowed targets %s\n", context->permissions.targets.start);
         }
         const pn_bytes_t authid = extract_authenticated_identity(properties);
         if (authid.start && authid.size) {
@@ -647,6 +643,8 @@ void qdr_handle_authentication_service_connection_event(pn_event_t *e)
 
         //close downstream connection
         pn_connection_close(conn);
+        pn_transport_close_tail(transport);
+        pn_transport_close_head(transport);
     } else if (pn_event_type(e) == PN_CONNECTION_REMOTE_CLOSE) {
         qd_log(auth_service_log, QD_LOG_DEBUG, "authentication service closed connection");
         pn_connection_close(conn);
