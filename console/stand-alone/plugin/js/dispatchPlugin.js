@@ -97,6 +97,12 @@ var QDR = (function(QDR) {
       .when('/charts', {
         templateUrl: QDR.templatePath + 'qdrCharts.html'
       })
+      .when('/chord', {
+        templateUrl: 'plugin/html/qdrChord.html'
+      })
+      .when('/app', {
+        templateUrl: 'plugin/html/qdrAppTopo.html'
+      })
       .when('/connect', {
         templateUrl: QDR.templatePath + 'qdrConnect.html'
       });
@@ -263,5 +269,31 @@ var QDR = (function(QDR) {
 
   });
 
+  // modified from http://benjii.me/2014/07/angular-directive-for-bootstrap-switch/
+  // allows ng-model tracking for jquery bootstrap-switch
+  QDR.module.directive('bootstrapSwitch', [
+    function() {
+      return {
+        restrict: 'A',
+        require: '?ngModel',
+        link: function(scope, element, attrs, ngModel) {
+          element.bootstrapSwitch('size', 'small');
+ 
+          element.on('switchChange.bootstrapSwitch', function(event, state) {
+            if (ngModel) {
+              scope.$apply(function() {
+                ngModel.$setViewValue(state);
+              });
+            }
+          });
+ 
+          scope.$watch(attrs.ngModel, function(newValue) {
+            element.bootstrapSwitch('state', newValue || false, true);
+          });
+        }
+      };
+    }
+  ]);
+ 
   return QDR;
 }(QDR || {}));
