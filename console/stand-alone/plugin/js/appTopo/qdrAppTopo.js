@@ -30,7 +30,7 @@ var QDR = (function (QDR) {
     }
 
     var getSizes = function() {
-      const legendWidth = 0;
+      const legendWidth = 200;
       const gap = 5;
       let width = $('#appTopo').width() - gap - legendWidth;
       let top = $('#appTopo').offset().top;
@@ -143,7 +143,7 @@ var QDR = (function (QDR) {
     var serviceRadius = 20;
     var clientHeight = 200;
     var clientWidth = 100;
-    var connectorR = 10;
+    var connectorR = 3;
     var draw = function () {
       var diamondSize = 30;
 
@@ -253,6 +253,41 @@ var QDR = (function (QDR) {
           });
         });
       }
+      // legend
+      d3.select('#legend-service').append('svg')
+        .attr('width', serviceRadius+4)
+        .attr('height', serviceRadius+4)
+        .append('svg:circle')
+        .attr('class', 'service-container service')
+        .attr('r', serviceRadius/2)
+        .attr('transform', 'translate('+(serviceRadius/2 + 2)+','+(serviceRadius/2 + 2)+')');
+
+      d3.select('#legend-client').append('svg')
+        .attr('width', serviceRadius+4)
+        .attr('height', serviceRadius+4)
+        .append('svg:path')
+        .attr('class', 'service-container client')
+        .attr('d', function () {
+          return d3.rect({x:0, y:0, width: serviceRadius, height: serviceRadius});
+        });
+
+      let legend_info = d3.select('#legend-info').append('svg')
+        .attr('width', serviceRadius+8)
+        .attr('height', serviceRadius+8)
+        .append('svg:g')
+        .attr('class', 'service-line-info')
+        .attr('transform', 'translate('+(serviceRadius/2 + 4)+','+(serviceRadius/2 + 4)+')' );
+
+      legend_info.append('svg:path')
+        .attr('class', 'service-info')
+        .attr('d', d3.svg.symbol().size(diamondSize*diamondSize/4).type('diamond'))
+      legend_info.append('svg:text')
+        .attr('class', 'info-text-small')
+        .attr('y', 8*diamondSize/30)
+        .text( '?')
+        .attr('text-anchor', 'middle');
+
+      //.attr('transform', 'translate('+(serviceRadius/2 + 2)+','+(serviceRadius/2 + 2)+')');
     };
     draw();
 
@@ -273,6 +308,7 @@ var QDR = (function (QDR) {
 
         // find the point where the line meets the target circle
         // needed in order to put the info diamond in the center of the line
+        /*
         let dx = sx - tx;
         let dy = sy - ty;
         let dh = Math.sqrt(dx*dx + dy*dy);
@@ -280,6 +316,7 @@ var QDR = (function (QDR) {
         let dyc = serviceRadius * dy / dh;
         tx = tx + dxc;
         ty = ty + dyc;
+        */
         return {sx: sx, tx: tx, sy: sy, ty: ty};
       };
       connectors
