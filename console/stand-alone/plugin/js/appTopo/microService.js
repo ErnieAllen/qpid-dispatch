@@ -22,17 +22,22 @@ under the License.
 // public object
 var MicroService = (function() {
   var nextID = 0;
-  return function(type) {
-    this.id = nextID++;
-    this.info = {};
-    this.type = type;
-    this.connections = [];
-    let position = angular.fromJson(localStorage['QDRAT' + this.id]);
-    if (position) {
-      this.x = position.x;
-      this.y = position.y;
-      this.fixed = !!+position.fixed;
+  return {
+    init: function (type) {
+      this.id = nextID++;
+      this.info = {};
+      this.type = type;
+      this.connections = [];
+      let position = angular.fromJson(localStorage['QDRAT' + this.id]);
+      if (position) {
+        this.x = position.x;
+        this.y = position.y;
+        this.fixed = !!+position.fixed;
+      }
+    },
+    reset: function () {
+      nextID = 0;
     }
-
   };
 })();
+

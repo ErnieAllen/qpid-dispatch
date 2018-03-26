@@ -53,7 +53,7 @@ var QDR = (function (QDR) {
       }
     };
 
-    var nodes, links, conn_links, width, height, nodeCount;
+    var nodes, links, width, height;
     let sizes = getSizes();
     width = sizes[0];
     height = sizes[1];
@@ -62,31 +62,32 @@ var QDR = (function (QDR) {
       .attr('height', height);
 
     nodes = [];
-    var node0 = new MicroService('Client');
+    MicroService.reset();
+    var node0 = new MicroService.init('Client');
     node0.info = {geo: {lat: 40, long: 40, city: 'Brno'}, ldap: 'ldap', nodeName: 'Canton'};
     node0.connections.push({source: 0, target: 1, si:0});
     node0.connections.push({source: 0, target: 2, si:1});
     nodes.push(node0);
 
-    var node1 = new MicroService();
+    var node1 = new MicroService.init();
     node1.connections.push({});
     nodes.push(node1);
 
-    var node2 = new MicroService();
+    var node2 = new MicroService.init();
     node2.connections.push({});
     nodes.push(node2);
     
-    var node3 = new MicroService('Client');
+    var node3 = new MicroService.init('Client');
     node3.connections.push({source: 3, target: 1, si:2});
     node3.connections.push({source: 3, target: 4, si:0});
     node3.connections.push({source: 3, target: 5, si:1});
     nodes.push(node3);
 
-    var node4 = new MicroService();
+    var node4 = new MicroService.init();
     node4.connections.push({});
     nodes.push(node4);
     
-    var node5 = new MicroService();
+    var node5 = new MicroService.init();
     node5.connections.push({});
     nodes.push(node5);
     
@@ -295,7 +296,15 @@ var QDR = (function (QDR) {
           return 'translate(' + (pos.sx + pos.tx) / 2 + ',' + (pos.sy + pos.ty) / 2 + ')';
         });
     }
+    window.addEventListener('resize', resize);
 
+    $scope.$on('$destroy', function() {
+      //QDR.log.debug("scope on destroy");
+      savePositions();
+
+      d3.select('#appTopo').remove();
+      window.removeEventListener('resize', resize);
+    });
 
   }]);
   return QDR;
