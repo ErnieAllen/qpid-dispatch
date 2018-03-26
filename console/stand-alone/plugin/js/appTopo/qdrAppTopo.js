@@ -140,8 +140,7 @@ var QDR = (function (QDR) {
     };
 
     var micro_services, connectors, connector_info;
-    var serviceHeight = 50;
-    var serviceWidth = 50;
+    var serviceRadius = 20;
     var clientHeight = 200;
     var clientWidth = 100;
     var connectorR = 10;
@@ -175,7 +174,7 @@ var QDR = (function (QDR) {
   
       micro_services.each(function (d) {
         var cons = d.connections.length;
-        var h = Math.max(d.type === 'Client' ? clientHeight : serviceHeight, cons*connectorR*2);
+        var h = Math.max(clientHeight, cons*connectorR*2);
         if (d.type === 'Client') {
           d3.select(this).append('svg:path')  // client rectangle
             .attr('class', 'service-container')
@@ -186,17 +185,16 @@ var QDR = (function (QDR) {
         } else {
           d3.select(this).append('svg:circle')  // micro-service circle
             .attr('class', 'service-container service')
-            .attr('r', serviceWidth)
+            .attr('r', serviceRadius)
             .on('mouseup', savePositions);
         }
 
         if (d.type === 'Client') {
-          let x = d.type === 'Client' ? 0 : serviceWidth;
           d.connections.forEach( function (conn, i) {
             d3.select(this).append('svg:circle')  // connector
               .attr('id', 'mc' + d.id + '_' + i)
               .attr('class', 'service-connection')
-              .attr('transform', 'translate(' + x + ',' + connectorY(cons, h, connectorR, i) + ')')
+              .attr('transform', 'translate(0,' + connectorY(cons, h, connectorR, i) + ')')
               .attr('r', connectorR);
           }.bind(this));
         }
@@ -264,7 +262,7 @@ var QDR = (function (QDR) {
 
       let getPositions = function (d) {
         var cons = d.source.connections.length;
-        var h = Math.max(d.source.type === 'Client' ? clientHeight : serviceHeight, cons*connectorR*2);
+        var h = Math.max(clientHeight, cons*connectorR*2);
         var sy = connectorY(cons, h, connectorR, d.si) + d.source.y;
         let sx = d.source.x;
         let tx = d.target.x;
@@ -278,8 +276,8 @@ var QDR = (function (QDR) {
         let dx = sx - tx;
         let dy = sy - ty;
         let dh = Math.sqrt(dx*dx + dy*dy);
-        let dxc = serviceWidth * dx / dh;
-        let dyc = serviceWidth * dy / dh;
+        let dxc = serviceRadius * dx / dh;
+        let dyc = serviceRadius * dy / dh;
         tx = tx + dxc;
         ty = ty + dyc;
         return {sx: sx, tx: tx, sy: sy, ty: ty};
