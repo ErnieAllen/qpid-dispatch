@@ -169,40 +169,37 @@ var QDR = (function (QDR) {
       micro_services = svg.selectAll('.micro-service')
         .data(nodes, function (d) { return d.id; })
         .enter().append('svg:g')
-        .attr('class', 'micro-service');
+        .attr('class', 'micro-service')
+        .attr('id', function (d) { return 'ms' + d.id; });
   
       micro_services.each(function (d) {
         var cons = d.connections.length;
         var h = Math.max(d.type === 'Client' ? clientHeight : serviceHeight, cons*connectorR*2);
-        d3.select(this).append('svg:path')  // rectangle
-          .attr('class', 'service-container')
-          .classed('service', function (d) {return d.type !== 'Client';})
-          .attr('d', function () {
-            return d3.rect({x:0, y:0, width: d.type === 'Client' ? clientWidth : serviceWidth, height: h});
-          })
-          .on('mouseup', savePositions);
-  
-        let x = d.type === 'Client' ? 0 : serviceWidth;
-        d.connections.forEach( function (conn, i) {
-          d3.select(this).append('svg:circle')  // connector
-            .attr('class', 'service-connection')
-            .attr('transform', 'translate(' + x + ',' + connectorY(cons, h, connectorR, i) + ')')
-            .attr('r', connectorR);
-        }.bind(this));
-
-        if (d.type === '_Client') {
-          x = d.type === 'Client' ? clientWidth : 0;
-          var gDiamond = d3.select(this).append('svg:g')     // info diamond
-            .attr('transform', 'translate(' + x + ',' + (h - diamondSize*0.5)/2  + ')' );
-          gDiamond.append('svg:path')
-            .attr('class', 'service-info')
-            .attr('d', d3.svg.symbol().size(diamondSize*diamondSize/2).type('diamond'));
-          gDiamond.append('svg:text')
-            .attr('class', 'info-text')
-            .attr('y', 8*diamondSize/30)
-            .text( '?')
-            .attr('text-anchor', 'middle');
+        if (d.type === 'Client') {
+          d3.select(this).append('svg:path')  // client rectangle
+            .attr('class', 'service-container')
+            .attr('d', function () {
+              return d3.rect({x:0, y:0, width: clientWidth, height: h});
+            })
+            .on('mouseup', savePositions);
+        } else {
+          d3.select(this).append('svg:circle')  // micro-service circle
+            .attr('class', 'service-container service')
+            .attr('r', serviceWidth)
+            .on('mouseup', savePositions);
         }
+
+        if (d.type === 'Client') {
+          let x = d.type === 'Client' ? 0 : serviceWidth;
+          d.connections.forEach( function (conn, i) {
+            d3.select(this).append('svg:circle')  // connector
+              .attr('id', 'mc' + d.id + '_' + i)
+              .attr('class', 'service-connection')
+              .attr('transform', 'translate(' + x + ',' + connectorY(cons, h, connectorR, i) + ')')
+              .attr('r', connectorR);
+          }.bind(this));
+        }
+        onDrag(d);
       });
 
       // bring the element that was clicked on to the front
@@ -216,6 +213,47 @@ var QDR = (function (QDR) {
       micro_services.on('dblclick', dblclick);
       // allow auto drag/drop
       micro_services.call(drag);
+      // move the connection circles based on relative positions of micro-services and clients
+      drag.on('drag', onDrag);
+      function onDrag(d) {
+        let clients = [], services = [];
+        if (d.type === 'Client') {
+          clients.push(d);
+          d.connections.forEach( function (connection) {
+            services.push(nodes[connection.target]);
+          });
+        } else {
+          services.push(d);
+          nodes.forEach (function (node) {
+            node.connections.forEach( function (connection) {
+              if (connection.target === d.id)
+                clients.push(node);
+            });
+          });
+        }
+        services.forEach( function (service) {
+          clients.forEach( function (client) {
+            let cx = 0;
+            for (var i=0,si=0; i<client.connections.length; i++) {
+              if (client.connections[i].target === service.id) {
+                si = client.connections[i].si;
+                break;
+              }
+            }
+            let cy = connectorY(client.connections.length, clientHeight, connectorR, si);
+            let client_circle = d3.select('#mc'+client.id + '_' + si);
+            if (service.x < client.x + clientWidth / 2) {
+              let cc = client.connections.filter( function (c) {return c.target === service.id;})[0];
+              cc['orientation'] = 'left';
+            } else {
+              let cc = client.connections.filter( function (c) {return c.target === service.id;})[0];
+              cc['orientation'] = 'right';
+              cx = clientWidth;
+            }
+            client_circle.attr('transform', function () {return 'translate('+cx+','+cy+')';});
+          });
+        });
+      }
     };
     draw();
 
@@ -223,20 +261,38 @@ var QDR = (function (QDR) {
       micro_services
         .attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; });
 
+      let getPositions = function (d) {
+        var cons = d.source.connections.length;
+        var h = Math.max(d.source.type === 'Client' ? clientHeight : serviceHeight, cons*connectorR*2);
+        var sy = connectorY(cons, h, connectorR, d.si) + d.source.y;
+        let sx = d.source.x;
+        let tx = d.target.x;
+        let ty = d.target.y;
+        let sconn = d.source.connections.filter( function (c) {return c.si === d.si;})[0];
+        if (sconn.orientation === 'right')
+          sx += clientWidth;
+
+        // find the point where the line meets the target circle
+        // needed in order to put the info diamond in the center of the line
+        let dx = sx - tx;
+        let dy = sy - ty;
+        let dh = Math.sqrt(dx*dx + dy*dy);
+        let dxc = serviceWidth * dx / dh;
+        let dyc = serviceWidth * dy / dh;
+        tx = tx + dxc;
+        ty = ty + dyc;
+        return {sx: sx, tx: tx, sy: sy, ty: ty};
+      };
       connectors
         .attr('d', function (d) {
-          var cons = d.source.connections.length;
-          var h = Math.max(d.source.type === 'Client' ? clientHeight : serviceHeight, cons*connectorR*2);
-          var dy = connectorY(cons, h, connectorR, d.si);
-          return 'M' + d.source.x + ',' + (d.source.y + dy) + 'L' + (d.target.x + serviceWidth) + ',' + (d.target.y + serviceHeight/2); 
+          let pos = getPositions(d);
+          return 'M' + pos.sx + ',' + pos.sy + 'L' + pos.tx + ',' + pos.ty; 
         });
 
       connector_info
         .attr('transform', function (d) {
-          var cons = d.source.connections.length;
-          var h = Math.max(d.source.type === 'Client' ? clientHeight : serviceHeight, cons*connectorR*2);
-          var dy = connectorY(cons, h, connectorR, d.si);
-          return 'translate(' + (d.source.x + d.target.x + serviceWidth) / 2 + ',' + (d.source.y + dy + d.target.y + serviceHeight/2) / 2 + ')';
+          let pos = getPositions(d);
+          return 'translate(' + (pos.sx + pos.tx) / 2 + ',' + (pos.sy + pos.ty) / 2 + ')';
         });
     }
 
