@@ -17,7 +17,7 @@ specific language governing permissions and limitations
 under the License.
 */
 'use strict';
-/* global angular d3 MicroService */
+/* global angular d3 MicroService svgPopup */
 
 var QDR = (function (QDR) {
   QDR.module.controller('QDR.AppTopoController', ['$scope', 'QDRService', '$location', '$timeout', function($scope, QDRService, $location, $timeout) {
@@ -34,7 +34,7 @@ var QDR = (function (QDR) {
       const gap = 5;
       let width = $('#appTopo').width() - gap - legendWidth;
       let top = $('#appTopo').offset().top;
-      let height = window.innerHeight - top - gap;
+      let height = window.innerHeight - top - gap*2;
       if (width < 10) {
         QDR.log.info('page width and height are abnormal w:' + width + ' height:' + height);
         return [0, 0];
@@ -53,13 +53,22 @@ var QDR = (function (QDR) {
       }
     };
 
+    let clearPopups = function () {
+      console.log('svg clicked');
+      if (!svg.ignore) {
+        d3.select('#bubble').remove();
+        d3.select('#popupDiv').remove();
+      }
+    };
     var nodes, links, width, height;
     let sizes = getSizes();
     width = sizes[0];
     height = sizes[1];
     var svg = d3.select('#appTopo').append('svg')
       .attr('width', width)
-      .attr('height', height);
+      .attr('height', height)
+      .on('click', clearPopups)
+      .on('mousemove', function () {svg.ignore = false;});
 
     nodes = [];
     MicroService.reset();
@@ -139,11 +148,42 @@ var QDR = (function (QDR) {
       return sp * (index+1) + (2*connectorR*index) + connectorR;
     };
 
+    let clickDiamond = function (d) {
+      svgPopup(svg, this, function () {
+        return '<h2>Connection info</h2><div><pre>'+ JSON.stringify(d, null, 2) +'</pre></div>';
+      });
+      d3.event.stopPropagation(); // so svg.click doesn't fire
+    };
+    let doClick = function (d, fn) {
+      savePositions();
+      let d3mouse = this.d3mouse;
+      if (d3mouse) {
+        // see if mouse moved
+        let here = d3.mouse(this.parentNode.parentNode);
+        if (d3mouse[0] === here[0] && d3mouse[1] === here[1]) {
+          // popup info and stop event propogation so the drag is not started
+          console.log('calling popup');
+          svg.ignore = true;
+          svgPopup(svg, this, fn);
+        }
+      }
+      this.d3mouse = undefined;
+    };
+    let clickService = function (d) {
+      doClick.call(this, d, function () {
+        return '<h2>Service info</h2><div><pre>'+ JSON.stringify(d, null, 2) +'</pre></div>';
+      });
+    };
+    let clickClient = function (d) {
+      doClick.call(this, d, function () {
+        return '<h2>Client info</h2><div><pre>'+ JSON.stringify(d, null, 2) +'</pre></div>';
+      });
+    };
     var micro_services, connectors, connector_info;
     var serviceRadius = 20;
     var clientHeight = 200;
     var clientWidth = 100;
-    var connectorR = 3;
+    var connectorR = 5;
     var draw = function () {
       var diamondSize = 30;
 
@@ -159,7 +199,9 @@ var QDR = (function (QDR) {
       
       connector_info.append('svg:path')
         .attr('class', 'service-info')
-        .attr('d', d3.svg.symbol().size(diamondSize*diamondSize/2).type('diamond'));
+        .attr('d', d3.svg.symbol().size(diamondSize*diamondSize/2).type('diamond'))
+        .on('click', clickDiamond);
+
       connector_info.append('svg:text')
         .attr('class', 'info-text')
         .attr('y', 8*diamondSize/30)
@@ -181,12 +223,18 @@ var QDR = (function (QDR) {
             .attr('d', function () {
               return d3.rect({x:0, y:0, width: clientWidth, height: h});
             })
-            .on('mouseup', savePositions);
+            .on('mousedown', function () {
+              this.d3mouse = d3.mouse(this.parentNode.parentNode).slice();
+            })
+            .on('mouseup', clickClient);
         } else {
           d3.select(this).append('svg:circle')  // micro-service circle
             .attr('class', 'service-container service')
             .attr('r', serviceRadius)
-            .on('mouseup', savePositions);
+            .on('mousedown', function () {
+              this.d3mouse = d3.mouse(this.parentNode.parentNode).slice();
+            })
+            .on('mouseup', clickService);
         }
 
         if (d.type === 'Client') {
@@ -280,7 +328,7 @@ var QDR = (function (QDR) {
 
       legend_info.append('svg:path')
         .attr('class', 'service-info')
-        .attr('d', d3.svg.symbol().size(diamondSize*diamondSize/4).type('diamond'))
+        .attr('d', d3.svg.symbol().size(diamondSize*diamondSize/4).type('diamond'));
       legend_info.append('svg:text')
         .attr('class', 'info-text-small')
         .attr('y', 8*diamondSize/30)

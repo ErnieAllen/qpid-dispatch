@@ -28,6 +28,9 @@
     fill: lightyellow;
   }
 
+  .service-connection {
+    fill: orange;
+  }
   .service-info {
     fill: lightblue;
     stroke: black;
@@ -71,6 +74,33 @@
     content: " ";
     display: block;
     clear: left;
+  }
+
+  #popupDiv {
+    position: absolute;
+    border: 1px solid black;
+    border-radius: 4px;
+    overflow-x:hidden;
+    overflow-y: hidden;
+    background-color: white;
+    text-align: center;
+
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+  #popupDiv h2 {
+    margin-top: 0;
+    margin-bottom: 2px;
+    padding: 2px;
+    background-color: #F0F0F0;
+    border-bottom: 1px solid #E0E0E0;
+  }
+  #popupDiv div {
+    text-align: left;
+    padding: 0 1em 1em 1em;
+    height: 88%;
+    overflow-y: auto;
   }
 </style>
 <div ng-controller="QDR.AppTopoController">
