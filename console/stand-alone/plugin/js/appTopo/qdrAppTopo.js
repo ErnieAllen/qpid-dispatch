@@ -17,7 +17,7 @@ specific language governing permissions and limitations
 under the License.
 */
 'use strict';
-/* global angular d3 MicroService svgPopup */
+/* global angular d3 nodes links svgPopup */
 
 var QDR = (function (QDR) {
   QDR.module.controller('QDR.AppTopoController', ['$scope', 'QDRService', '$location', '$timeout', function($scope, QDRService, $location, $timeout) {
@@ -28,6 +28,20 @@ var QDR = (function (QDR) {
       QDR.redirectWhenConnected($location, 'app');
       return;
     }
+
+    $scope.modes = [
+      {title: 'Topology view', name: 'Diagram', right: false},
+      {title: '3D Globe view', name: 'Globe', right: false}
+    ];
+    $scope.mode = angular.fromJson(localStorage['QDR.topoMode']) || 'Diagram';
+    $scope.isModeActive = function (name) {
+      return ($scope.mode == name);
+    };
+    $scope.selectMode = function (name) {
+      $scope.mode = name;
+      localStorage['QDR.topoMode'] = angular.toJson(name);
+
+    };
 
     var getSizes = function() {
       const legendWidth = 200;
@@ -60,7 +74,7 @@ var QDR = (function (QDR) {
         d3.select('#popupDiv').remove();
       }
     };
-    var nodes, links, width, height;
+    var width, height;
     let sizes = getSizes();
     width = sizes[0];
     height = sizes[1];
@@ -69,46 +83,6 @@ var QDR = (function (QDR) {
       .attr('height', height)
       .on('click', clearPopups)
       .on('mousemove', function () {svg.ignore = false;});
-
-    nodes = [];
-    MicroService.reset();
-    var node0 = new MicroService.init('Client');
-    node0.info = {geo: {lat: 40, long: 40, city: 'Brno'}, ldap: 'ldap', nodeName: 'Canton'};
-    node0.connections.push({source: 0, target: 1, si:0});
-    node0.connections.push({source: 0, target: 2, si:1});
-    nodes.push(node0);
-
-    var node1 = new MicroService.init();
-    node1.connections.push({});
-    nodes.push(node1);
-
-    var node2 = new MicroService.init();
-    node2.connections.push({});
-    nodes.push(node2);
-    
-    var node3 = new MicroService.init('Client');
-    node3.connections.push({source: 3, target: 1, si:2});
-    node3.connections.push({source: 3, target: 4, si:0});
-    node3.connections.push({source: 3, target: 5, si:1});
-    nodes.push(node3);
-
-    var node4 = new MicroService.init();
-    node4.connections.push({});
-    nodes.push(node4);
-    
-    var node5 = new MicroService.init();
-    node5.connections.push({});
-    nodes.push(node5);
-    
-    
-    links = [];
-    nodes.forEach ( function (node) {
-      node.connections.forEach( function (connection) {
-        if (angular.isDefined(connection.source)) {
-          links.push({source: connection.source, target: connection.target, si: connection.si});
-        }
-      });
-    });
 
     var savePositions = function () {
       nodes.forEach( function (d) {

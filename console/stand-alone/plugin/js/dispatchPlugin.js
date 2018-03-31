@@ -97,9 +97,6 @@ var QDR = (function(QDR) {
       .when('/charts', {
         templateUrl: QDR.templatePath + 'qdrCharts.html'
       })
-      .when('/chord', {
-        templateUrl: 'plugin/html/qdrChord.html'
-      })
       .when('/app', {
         templateUrl: 'plugin/html/qdrAppTopo.html'
       })
