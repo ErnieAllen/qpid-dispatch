@@ -20,10 +20,13 @@ under the License.
 'use strict';
 /* global angular Promise */
 
+const SAMPLES = 3;  // number of snapshots to use for rate calculations
+
 function ChordData (QDRService, isRate, converter) {
   this.QDRService = QDRService;
   this.last_matrix = undefined;
   this.last_values = {values: undefined, timestamp: undefined};
+  this.snapshots = [];  // last N values used for calculating rate
   this.isRate = isRate;
   // fn to convert raw data to matrix
   this.converter = converter;
@@ -41,22 +44,26 @@ ChordData.prototype.setFilter = function (filter) {
 };
 ChordData.prototype.getAddresses = function () {
   let addresses = {};
-  this.last_values.values.forEach( function (lv) {
-    if (!(lv.address in addresses)) {
-      addresses[lv.address] = this.filter.indexOf(lv.address) < 0;
-    }
-  }.bind(this));
+  this.snapshots.forEach( function (snap) {
+    snap.values.forEach( function (lv) {
+      if (!(lv.address in addresses)) {
+        addresses[lv.address] = this.filter.indexOf(lv.address) < 0;
+      }
+    }, this);
+  }, this);
   return addresses;
 };
 ChordData.prototype.getRouters = function () {
   let routers = {};
-  this.last_values.values.forEach( function (lv) {
-    if (!(lv.egress in routers)) {
-      routers[lv.egress] = true;
-    }
-    if (!(lv.ingress in routers)) {
-      routers[lv.ingress] = true;
-    }
+  this.snapshots.forEach( function (snap) {
+    snap.values.forEach( function (lv) {
+      if (!(lv.egress in routers)) {
+        routers[lv.egress] = true;
+      }
+      if (!(lv.ingress in routers)) {
+        routers[lv.ingress] = true;
+      }
+    });
   });
   return Object.keys(routers).sort();
 };
@@ -135,21 +142,46 @@ ChordData.prototype.getMatrix = function () {
 // Private functions
 
 // compare the current values to the last_values and return the rate/second
-let calcRate = function (values, last_values) {
-  let rateValues = [];
+let calcRate = function (values, last_values, snapshots) {
   let now = Date.now();
-  let elapsed = last_values.timestamp ? (now - last_values.timestamp) / 1000 : 0;
-  values.forEach( function (value) {
-    let last_index = last_values.values ? 
-      last_values.values.findIndex( function (lv) {
-        return lv.ingress === value.ingress &&
-            lv.egress === value.egress &&
-            lv.address === value.address; 
-      }) : -1;
-    let rate = 0;
-    if (last_index >= 0) {
-      rate = (value.messages - last_values.values[last_index].messages) / elapsed;
+  if (!last_values.values) {
+    last_values.values = values;
+    last_values.timestamp = now - 1000;
+  }
+
+  // ensure the snapshots are initialized
+  if (snapshots.length < SAMPLES) {
+    for (let i=0; i<SAMPLES; i++) {
+      if (snapshots.length < i+1) {
+        snapshots[i] = angular.copy(last_values);
+        snapshots[i].timestamp = now - (1000 * (SAMPLES-i));
+      }
     }
+  }
+  // remove oldest sample
+  snapshots.shift();
+  // add the new values to the end.
+  snapshots.push(angular.copy(last_values));
+
+  let oldest = snapshots[0];
+  let rateValues = [];
+  let elapsed = (now - oldest.timestamp) / 1000;
+  values.forEach( function (value) {
+
+    let rate = 0;
+    let total = 0;
+    snapshots.forEach ( function (snap) {
+      let last_index = snap.values.findIndex( function (lv) {
+        return lv.ingress === value.ingress &&
+              lv.egress === value.egress &&
+              lv.address === value.address; 
+      });
+      if (last_index >= 0) {
+        total += snap.values[last_index].messages;
+      }
+    });
+    rate = (value.messages - (total / snapshots.length)) / elapsed;
+
     rateValues.push({ingress: value.ingress, 
       egress: value.egress, 
       address: value.address,
@@ -175,7 +207,7 @@ let convert = function (self, values) {
   sortByKeys(values);
 
   if (self.isRate) {
-    let rateValues = calcRate(values, self.last_values);
+    let rateValues = calcRate(values, self.last_values, self.snapshots);
     self.last_values.values = angular.copy(values);
     self.last_values.timestamp = Date.now();
     values = rateValues;
