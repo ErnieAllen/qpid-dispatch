@@ -279,7 +279,7 @@ var QDR = (function (QDR) {
 
       // if there is no data, hide the svg and show a message 
       if (!matrix.hasValues()) {
-        d3.select('#chord svg').remove();
+        //d3.select('#chord svg').remove();
         $timeout( function () {
           $scope.noValues = true;
         });
@@ -485,7 +485,7 @@ var QDR = (function (QDR) {
 
       // if there is no data, hide the svg and show a message 
       if (!matrix.hasValues()) {
-        d3.select('#chord svg').remove();
+        //d3.select('#chord svg').remove();
         $timeout( function () {
           $scope.noValues = true;
         });

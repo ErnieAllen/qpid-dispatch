@@ -173,7 +173,7 @@
   
   <div ng-controller="QDR.ChordController">
     <div ng-show="noValues"><h2>There is no message traffic</h2></div>
-    <div id="chord"></div>
+    <div ng-hide="noValues" id="chord"></div>
     <div id="controls">
       <div id="switches">
         <ul>
