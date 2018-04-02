@@ -18,7 +18,7 @@ under the License.
 */
 'use strict';
 
-/* global angular d3 topojson nodes links */
+/* global angular d3 topojson nodes */
 /**
  * @module QDR
  */
@@ -53,10 +53,20 @@ var QDR = (function(QDR) {
         .clipAngle(90)
         .scale(220);
 
+      var map = d3.geo.equirectangular()
+        .scale(145)
+        .center([0, 0])
+        .translate([wwidth / 2, wheight / 2])
+
       var sky = d3.geo.orthographic()
         .translate([wwidth / 2, ypos])
         .clipAngle(90)
-        .scale(230);
+        .scale(220);
+
+      var mapsky = d3.geo.equirectangular()
+        .scale(145)
+        .center([0, 0])
+        .translate([wwidth / 2, wheight / 2])
 
       var wpath = d3.geo.path().projection(proj).pointRadius(6);
       var wlinks = [],
@@ -207,20 +217,6 @@ var QDR = (function(QDR) {
           return coordinates;
         };
         // spawn links between cities as source/target coord pairs
-        places.features.forEach(function(a, i) {
-          if (nodes.findIndex( function (client) { return client.info.geo ? client.info.geo.name === a.properties.NAME : false;}) > -1) {
-            places.features.forEach(function(b, j) {
-              if (nodes.findIndex( function (client) { return client.info.geo ? client.info.geo.name === b.properties.NAME : false;}) > -1) {
-                if (j > i) {  // avoid duplicates
-                  wlinks.push({
-                    source: a.geometry.coordinates,
-                    target: b.geometry.coordinates
-                  });
-                }
-              }
-            });
-          }
-        });
         wlinks = [];
         nodes.forEach ( function (node) {
           if (node.type === 'Client') {
@@ -238,7 +234,13 @@ var QDR = (function(QDR) {
         });
         // build geoJSON features from links array
         wlinks.forEach(function(e) {
-          var feature =   { 'type': 'Feature', 'geometry': { 'type': 'LineString', 'coordinates': [e.source,e.target] }};
+          var feature = {
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: [e.source,e.target]
+            }
+          };
           arcLines.push(feature);
         });
 

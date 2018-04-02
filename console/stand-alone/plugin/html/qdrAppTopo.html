@@ -168,13 +168,21 @@
     stroke-width: .5;
   }
 
+  #map {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
 </style>
 <div ng-controller="QDR.AppTopoController">
     <ul class="nav nav-tabs topoModes">
         <li ng-repeat="mode in modes" ng-class="{active : isModeActive(mode.name), 'pull-right' : isRight(mode)}" ng-click="selectMode(mode.name)" >
             <a data-placement="bottom" class="ng-binding"> {{mode.name}} </a></li>
     </ul>
+    <button ng-click="showMap()" class="btn btn-primary">Map</button>
     <div id="appTopo" ng-show="mode == 'Diagram'"><!-- app toplogy here --></div>
+    <div id="map"></div>
     <div class="geology_container" ng-controller="QDR.GeoController">
         <div id="geology" ng-show="mode == 'Globe'"><!-- globe here --></div>
     </div>

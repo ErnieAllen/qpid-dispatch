@@ -17,7 +17,7 @@ specific language governing permissions and limitations
 under the License.
 */
 'use strict';
-/* global angular d3 nodes links svgPopup */
+/* global angular d3 nodes links svgPopup topojson */
 
 var QDR = (function (QDR) {
   QDR.module.controller('QDR.AppTopoController', ['$scope', 'QDRService', '$location', '$timeout', function($scope, QDRService, $location, $timeout) {
@@ -106,6 +106,75 @@ var QDR = (function (QDR) {
       .on('end', function () {savePositions();})
       .start();
 
+
+    var map_ = d3.geo.equirectangular()
+      .scale(Math.min((width/Math.PI)/2, (height/Math.PI)/2))
+      //.scale(133)
+      .center([0, 0])
+      .translate([width / 2, height / 2]);
+
+    var map = d3.geo.mercator()
+      //.scale((width - 3) / (2 * Math.PI))
+      .scale(100)
+      .translate([width / 2, height / 2]);
+    let mpath = d3.geo.path().projection(map);
+
+    $scope.showMap = function () {
+      d3.select('#map svg').remove();
+      let wsvg = d3.select('#map').append('svg')
+        .attr('width', width)
+        .attr('height', height)
+        .append('svg:g')
+        .attr('class', 'map');
+
+      let ready = function (error, world, places) {
+        wsvg.append('g').append('path')
+          .datum(topojson.feature(world, world.objects.land))
+          .attr('class', 'land noclicks')
+          .attr('d', mpath)
+          .attr('transform', 'translate('+[width/2,height/2]+') scale(1e-6)')
+          .transition().duration(750)
+          .attr('transform', 'translate('+[-width/2, -height/2]+') scale(2)');
+
+        let adjust_longitude = function (lat, deg) {
+          let dist = d3.scale.linear()
+            .domain([90, 0])
+            .range([0, Math.PI/2]);
+          let x = Math.max(Math.sin(dist(lat)), 0.1);
+          return deg/x;
+        };
+  
+        let mclients = [];
+        nodes.forEach ( function (n) {
+          if (n.geometry && n.type === 'Client') {
+            let coordinates = [];
+            let x = n.geometry.coordinates[0];
+            let y = n.geometry.coordinates[1];
+            const xoff = adjust_longitude(y, 1);
+            const yoff = 1.5;
+            coordinates[0] = [x - xoff, y - yoff];
+            coordinates[1] = [x + xoff, y - yoff];
+            coordinates[2] = [x + xoff, y + yoff];
+            coordinates[3] = [x - xoff, y + yoff];
+            coordinates[4] = coordinates[0];
+            let feature = {type: 'Feature', geometry: {type: 'LineString', coordinates: coordinates}};
+            mclients.push(feature);
+          }
+        });
+  
+        wsvg.append('g').attr('class', 'clients')
+          .selectAll('path').data(mclients)
+          .enter().append('path')
+          .attr('class', 'sclient')
+          .attr('d', mpath);
+
+      };
+      d3.queue()
+        .defer(d3.json, 'plugin/data/world-110m.json')
+        .defer(d3.json, 'plugin/data/places1.json')
+        .await(ready);
+
+    };
     function dragstart(d) {
       d3.select(this).classed('fixed', d.fixed = true);
     }
