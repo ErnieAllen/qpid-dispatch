@@ -549,8 +549,6 @@ var QDR = (function (QDR) {
         .each( function (d, i) {
           d3.select(this).select('text')
             .attr('text-anchor', function(d) {
-              if (this.innerHTML === 'Canton')
-                console.log('canton angle is ' + d.angle);
               return d.angle > Math.PI ? 'end' : null;
             })
             .attr('transform', function(d) {
