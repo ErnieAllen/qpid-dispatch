@@ -544,6 +544,20 @@ var QDR = (function (QDR) {
         .transition()
         .duration(transitionDuration)
         .attrTween('transform', tickTween(last_chord, matrix));
+
+      svg.selectAll('.routers')
+        .each( function (d, i) {
+          d3.select(this).select('text')
+            .attr('text-anchor', function(d) {
+              if (this.innerHTML === 'Canton')
+                console.log('canton angle is ' + d.angle);
+              return d.angle > Math.PI ? 'end' : null;
+            })
+            .attr('transform', function(d) {
+              return d.angle > Math.PI ? 'rotate(180)translate(-16)' : null;
+            });
+        });
+
       last_chord = rechord;
     }
 

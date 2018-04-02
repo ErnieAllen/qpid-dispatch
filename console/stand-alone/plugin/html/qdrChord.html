@@ -49,11 +49,17 @@
     display: inline-block;
   }
   #legend .legend-address {
+    white-space: nowrap;
     padding: 0.1em 0.5em 0.2em;
     position: absolute;
     left: 10px;
     top: -5px;
   }
+
+  #legend .legend-router {
+    white-space: nowrap;
+  }
+
   #legend .legend-line {
     margin: 1em;
     border: 1px solid white;
@@ -120,7 +126,7 @@
 .checkboxFour {
   width: 14px;
   height: 14px;
-  position: relative;
+  position: absolute;
   margin: 4px 0;
 
 /*
@@ -170,6 +176,10 @@
   content: "\f126";
 }
 
+  .legend-min-address {
+    padding-left: 15px;
+    opacity: 0;
+  }
   </style>
   
   <div ng-controller="QDR.ChordController">
@@ -187,17 +197,20 @@
         <ul>
           <li ng-repeat="(router, color) in arcColors" class="legend-line" ng-mouseover="enterRouter(router)" ng-mouseleave="leaveLegend()">
             <span class='legend-color' ng-style="{'background-color': color}"></span>
-            <span title="{{router}}">{{router | limitTo:15}}{{router.length>15 ? '…' : ''}}</span>
+            <span class='legend-router' title="{{router}}">{{router | limitTo:15}}{{router.length>15 ? '…' : ''}}</span>
           </li>
         </ul>
         <h4>Addresses</h4>
         <ul class="addresses">
           <li ng-repeat="(address, color) in addresses" class="legend-line">
+            <div>
             <div class="checkboxFour" ng-mouseenter="enterLegend(address)" ng-mouseleave="leaveLegend()" style="background-color: {{chordColors[address]}};">
               <input type="checkbox" value="1" id="addr-{{address}}" name="" ng-model="addresses[address]" ng-change="addressFilterChanged()"/>
               <label ng-class="legendOptions.byAddress ? 'byAddress' : 'aggregate'" for="addr-{{address}}" ng-style="{'background-color': chordColors[address] || 'white', 'border': '1px solid {{chordColors[address] || '#333'}}'}"></label>
               <span ng-click="addressClick(address)" class='legend-address' title="{{address}}">{{address | limitTo : 15}}{{address.length>15 ? '…' : ''}}</span> 
             </div>
+            <span class='legend-min-address'>{{address | limitTo : 15}}{{address.length>15 ? '…' : ''}}</span> 
+          </div>
           </li>
         </ul>
       </div>
