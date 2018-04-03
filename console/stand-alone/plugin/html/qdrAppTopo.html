@@ -180,7 +180,7 @@
         <li ng-repeat="mode in modes" ng-class="{active : isModeActive(mode.name), 'pull-right' : isRight(mode)}" ng-click="selectMode(mode.name)" >
             <a data-placement="bottom" class="ng-binding"> {{mode.name}} </a></li>
     </ul>
-    <button ng-click="showMap()" class="btn btn-primary">Map</button>
+    <!-- <button ng-click="showMap()" class="btn btn-primary">Map</button> -->
     <div id="appTopo" ng-show="mode == 'Diagram'"><!-- app toplogy here --></div>
     <div id="map"></div>
     <div class="geology_container" ng-controller="QDR.GeoController">

@@ -185,7 +185,7 @@ var QDR = (function(QDR) {
           .attr('r', proj.scale())
           .attr('class','noclicks')
           .style('fill', 'url(#globe_shading)');
-
+        /*
         nodes.forEach( function (node) {
           if (node.info.geo) {
             places.features.forEach( function (f) {
@@ -195,7 +195,7 @@ var QDR = (function(QDR) {
             });
           }
         });
-
+        */
         /*
           wsvg.append('g').attr('class','points')
             .selectAll('text').data(filtered)
@@ -222,8 +222,8 @@ var QDR = (function(QDR) {
           if (node.type === 'Client') {
             node.connections.forEach( function (connection) {
               if (angular.isDefined(connection.source) && angular.isDefined(connection.target)) {
-                let scoord = get_coordinates(nodes[connection.source].info.geo.name);
-                let tcoord = get_coordinates(nodes[connection.target].info.geo.name);
+                let scoord = nodes[connection.source].info.geo.coordinates;
+                let tcoord = nodes[connection.target].info.geo.coordinates;
                 wlinks.push({
                   source: scoord,
                   target: tcoord
@@ -286,15 +286,12 @@ var QDR = (function(QDR) {
           .attr('class', 'diamond-shadow')
           .attr('d', wpath);
 
-        let clients = nodes.filter( function (n) { return n.geometry ? n.type === 'Client' : false; });
-        let services = nodes.filter( function (n) { return n.geometry ? n.type !== 'Client' : false; });
-
-        clients = [];
+        let clients = [];
         nodes.forEach ( function (n) {
-          if (n.geometry && n.type === 'Client') {
+          if (n.info.geo && n.type === 'Client') {
             let coordinates = [];
-            let x = n.geometry.coordinates[0];
-            let y = n.geometry.coordinates[1];
+            let x = n.info.geo.coordinates[0];
+            let y = n.info.geo.coordinates[1];
             const xoff = adjust_longitude(y, 1);
             const yoff = 1.5;
             coordinates[0] = [x - xoff, y - yoff];
@@ -325,10 +322,10 @@ var QDR = (function(QDR) {
           .attr('height', 100);
 */
 
-        services = [];
+        let services = [];
         nodes.forEach ( function (n) {
-          if (n.geometry && n.type !== 'Client') {
-            services.push(n.geometry);
+          if (n.info.geo && n.type !== 'Client') {
+            services.push({type: 'Point', coordinates: n.info.geo.coordinates});
           }
         });
         wsvg.append('g').attr('class', 'services')
@@ -360,11 +357,8 @@ var QDR = (function(QDR) {
           .attr('class', 'diamond')
           .attr('d', d3.geo.path().projection(sky));
 
-        let labelNodes = nodes.filter( function ( node ) {
-          return (node.geometry);
-        });
         wsvg.append('g').attr('class','labels')
-          .selectAll('text').data(labelNodes)
+          .selectAll('text').data(nodes)
           .enter().append('text')
           .attr('class', 'label')
           .text(function(d) { 
@@ -391,13 +385,13 @@ var QDR = (function(QDR) {
 
         wsvg.selectAll('.label')
           .attr('transform', function(d) {
-            var loc = proj(d.geometry.coordinates);
+            var loc = proj(d.info.geo.coordinates);
             loc[0] -= 3;
             loc[1] -= 7;
             return 'translate(' + loc + ') scale(' + (1/zoom.scale()) + ')';
           })
           .style('display',function(d) {
-            var z = arc.distance({source: d.geometry.coordinates, target: centerPos});
+            var z = arc.distance({source: d.info.geo.coordinates, target: centerPos});
             return (z > 1.57) ? 'none' : 'inline';
           });
         /*

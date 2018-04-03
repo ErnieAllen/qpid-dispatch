@@ -146,10 +146,10 @@ var QDR = (function (QDR) {
   
         let mclients = [];
         nodes.forEach ( function (n) {
-          if (n.geometry && n.type === 'Client') {
+          if (n.geo && n.type === 'Client') {
             let coordinates = [];
-            let x = n.geometry.coordinates[0];
-            let y = n.geometry.coordinates[1];
+            let x = n.geo.coordinates[0];
+            let y = n.geo.coordinates[1];
             const xoff = adjust_longitude(y, 1);
             const yoff = 1.5;
             coordinates[0] = [x - xoff, y - yoff];
