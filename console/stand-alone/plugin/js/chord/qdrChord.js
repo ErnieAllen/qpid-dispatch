@@ -265,6 +265,19 @@ var QDR = (function (QDR) {
       let path = chordReference(d);
       return editPath(path);
     }
+    function _editPath(path) {
+      let ratio = 0.6;
+      let find=path.match(/([\-\.0-9]+)\,([\-\.0-9]+)Q 0,0 ([\-\.0-9]+),([\-\.0-9]+)/);
+      if (!find) {
+        console.log('Q 0 0 not found in path ' + path);
+        return path;
+      }
+  
+      path=path.replace(/Q 0,0/,'C '+find[1]*ratio+','+find[2]*ratio+' '+find[3]*ratio+','+find[4]*ratio);
+      console.log('fixed path');
+      return path;
+    }
+
     // The path for the chords are drawn like:
     // 1. move to the 1st point along the circle
     // 2. arc from there to the 2nd point along the circle
@@ -303,48 +316,41 @@ var QDR = (function (QDR) {
       // for the 2nd point of the other bezier
       let Q2 = pathSegments[4].split(commaOrSpace);
 
-      /*
-      function round(number, precision) {
-        var shift = function (number, precision, reverseShift) {
-          if (reverseShift) {
-            precision = -precision;
-          }  
-          let numArray = ("" + number).split("e");
-          return +(numArray[0] + "e" + (numArray[1] ? (+numArray[1] + precision) : precision));
-        };
-        return shift(Math.round(shift(number, precision, false)), precision, true);
-      }
-      */
-      let getControlPoint = function (x1, y1, x2, y2) {
-        x1 = +x1;
-        x2 = +x2;
-        y1 = +y1;
-        y2 = +y2;
-        // get the mid point
-        let mx = (x1+x2)/2;
-        let my = (y1+y2)/2;
+      let bezierScale = d3.scale.linear().domain([0,1]).range([.5, 1]);
+      let getControlPoints = function (x1, y1, x2, y2, x3, y3, x4, y4) {
+        // inputs are strings. convert to numbers
+        x1 = +x1; x2 = +x2; y1 = +y1; y2 = +y2; 
+        x3 = +x3; x4 = +x4; y3 = +y3; y4 = +y4;
 
-        // get the distance between the 2 points
+        // get the distance between the 1st 2 points
         let dx = x1-x2;
         let dy = y1-y2;
-        let dist = Math.sqrt(dx*dx + dy*dy);
+        let dist1 = Math.sqrt(dx*dx + dy*dy);
+        // get the distance between the 2nd 2 points
+        dx = x3-x4;
+        dy = y3-y4;
+        let dist2 = Math.sqrt(dx*dx + dy*dy);
 
-        // use ratio to determine how far to move the control point away from the center toward the mid point
-        let ratio = (dist/2) / innerRadius;
-        /*
-        console.log('for dist=' + dist + ' ratio=' + ratio);
-        console.log('  p=' + [[round(x1,3),round(y1,3)], [round(x2,3),round(y2,3)]]);
-        console.log('  m=' + [round(mx,3),round(my,3)]);
-        console.log('  c=' + [round((1-ratio)*mx,3), round((1-ratio)*my,3)]);
-        */
-        return [(1-ratio)*mx, (1-ratio)*my];
+        if (dist1 < dist2) {
+          // get the mid point
+          let mx = (x1+x2)/2;
+          let my = (y1+y2)/2;
+          // use ratio to determine how far to move the control point away from the center toward the mid point
+          let ratio = bezierScale((dist1/2) / innerRadius);
+          return [[(1-ratio)*mx, (1-ratio*my)], [0,0]];
+        } else {
+          // get the mid point
+          let mx = (x3+x4)/2;
+          let my = (y3+y4)/2;
+          // use ratio to determine how far to move the control point away from the center toward the mid point
+          let ratio = bezierScale((dist2/2) / innerRadius);
+          return [[0,0], [(1-ratio)*mx, (1-ratio)*my]];
+        }
       };
-      // get a control point for the bezier from the end of the arc to the beginning of the next arc
-      let Q1Control = getControlPoint(A1[5], A1[6], Q1[3], Q1[4]);
-      // the path has 2 beziers
-      let Q2Control = getControlPoint(A2[5], A2[6], Q2[3], Q2[4]);
-      pathSegments[2] = 'Q ' + Q1Control + ' ' + Q1[3] + ',' + Q1[4];
-      pathSegments[4] = 'Q ' + Q2Control + ' ' + Q2[3] + ',' + Q2[4];
+      // get control points for the bezier from the end of the arc to the beginning of the next arc
+      let ctrls = getControlPoints(A1[5], A1[6], Q1[3], Q1[4], A2[5], A2[6], Q2[3], Q2[4]);
+      pathSegments[2] = 'Q ' + ctrls[0] + ' ' + Q1[3] + ',' + Q1[4];
+      pathSegments[4] = 'Q ' + ctrls[1] + ' ' + Q2[3] + ',' + Q2[4];
 
       let newPath = pathSegments.join('');
 
