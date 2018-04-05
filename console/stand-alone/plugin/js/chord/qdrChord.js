@@ -17,7 +17,7 @@ specific language governing permissions and limitations
 under the License.
 */
 'use strict';
-/* global angular d3 separateAddresses aggregateAddresses ChordData */
+/* global angular d3 separateAddresses aggregateAddresses ChordData Bezier */
 
 var QDR = (function (QDR) {
   QDR.module.controller('QDR.ChordController', ['$scope', 'QDRService', '$location', '$timeout', function($scope, QDRService, $location, $timeout) {
@@ -29,6 +29,7 @@ var QDR = (function (QDR) {
       return;
     }
 
+    const MIN_BEZIER = .5;
     const CHORDOPTIONSKEY = 'chordOptions';
     const CHORDFILTERKEY = 'chordFilter';
     // flag to show/hide the 'There are no values' message on the html page
@@ -265,18 +266,6 @@ var QDR = (function (QDR) {
       let path = chordReference(d);
       return editPath(path);
     }
-    function _editPath(path) {
-      let ratio = 0.6;
-      let find=path.match(/([\-\.0-9]+)\,([\-\.0-9]+)Q 0,0 ([\-\.0-9]+),([\-\.0-9]+)/);
-      if (!find) {
-        console.log('Q 0 0 not found in path ' + path);
-        return path;
-      }
-  
-      path=path.replace(/Q 0,0/,'C '+find[1]*ratio+','+find[2]*ratio+' '+find[3]*ratio+','+find[4]*ratio);
-      console.log('fixed path');
-      return path;
-    }
 
     // The path for the chords are drawn like:
     // 1. move to the 1st point along the circle
@@ -294,8 +283,13 @@ var QDR = (function (QDR) {
       // split out any letter followed by (non-letter or e)
       var pathSegmentPattern = /[a-z]([^a-z]|e)*/ig;
       var pathSegments = path.match(pathSegmentPattern);
-      if (pathSegments.length < 6)
+      if (pathSegments.length < 6) {
+        //console.log('returning original path');
+        //console.log(path);
         return path;
+      }
+      //console.log('---');
+      //console.log(path);
       /* pathSegments looks like:
       "M18.109129956792305,-301.4565630604317"
       "A302,302 0 1,1 -211.36504180953455,215.70539886811758"
@@ -306,6 +300,7 @@ var QDR = (function (QDR) {
       */
       // get the points used to draw the bezier
       let commaOrSpace = /[\s,]+/;
+      let M1 = pathSegments[0].split(commaOrSpace);
       // the 1st point is defined at the end of the 1st arc
       let A1 = pathSegments[1].split(commaOrSpace);
       // the 2nd point is at the end of the bezier
@@ -316,12 +311,47 @@ var QDR = (function (QDR) {
       // for the 2nd point of the other bezier
       let Q2 = pathSegments[4].split(commaOrSpace);
 
-      let bezierScale = d3.scale.linear().domain([0,1]).range([.5, 1]);
+      let bezierScale = d3.scale.linear().domain([0,1]).range([MIN_BEZIER, 1]);
+      /*
+      function r(number, precision) {
+        precision = 2;
+        var shift = function (number, precision, reverseShift) {
+          if (reverseShift) {
+            precision = -precision;
+          }  
+          let numArray = ("" + number).split("e");
+          return +(numArray[0] + "e" + (numArray[1] ? (+numArray[1] + precision) : precision));
+        };
+        return shift(Math.round(shift(number, precision, false)), precision, true);
+      }
+      */
       let getControlPoints = function (x1, y1, x2, y2, x3, y3, x4, y4) {
         // inputs are strings. convert to numbers
         x1 = +x1; x2 = +x2; y1 = +y1; y2 = +y2; 
         x3 = +x3; x4 = +x4; y3 = +y3; y4 = +y4;
+        let dmx = x1-x4, dmy = y1-y4;
+        let dmx2 = x2-x3, dmy2 = y2-y3;
+        let curve1 = new Bezier(x1, y1, 0, 0, x2, y2);
+        let curve2;// = new Bezier(x3, y3, 0, 0, x4, y4);
 
+        if (Math.abs(dmx) < 1e-2 && Math.abs(dmy) < 1e-2) {
+          //console.log('points too close for intersection calc. Adjusting.');
+          curve2 = new Bezier(x3, y3, 0, 0, x4-.1, y4);
+        } else if (Math.abs(dmx2) < 1e-2 && Math.abs(dmy2) < 1e-2) {
+          //console.log('middle points too close for intersection calc. Adjusting.');
+          curve2 = new Bezier(x3+.1, y3, 0, 0, x4, y4);
+          //console.dump(curve1);
+          //console.dump(curve2);
+        } else
+          curve2 = new Bezier(x3, y3, 0, 0, x4, y4);
+
+        let intersects = curve1.intersects(curve2);
+        if (intersects.length < 2) {
+          //console.log('no intersections');
+          return {top: -1, cp: [0,0]};
+        }
+        //else
+        //  console.log('there are ' + intersects.length + ' intersections');
         // get the distance between the 1st 2 points
         let dx = x1-x2;
         let dy = y1-y2;
@@ -331,29 +361,49 @@ var QDR = (function (QDR) {
         dy = y3-y4;
         let dist2 = Math.sqrt(dx*dx + dy*dy);
 
+        let mx, my, ratio, top;
         if (dist1 < dist2) {
           // get the mid point
-          let mx = (x1+x2)/2;
-          let my = (y1+y2)/2;
+          mx = (x1+x2)/2;
+          my = (y1+y2)/2;
           // use ratio to determine how far to move the control point away from the center toward the mid point
-          let ratio = bezierScale((dist1/2) / innerRadius);
-          return [[(1-ratio)*mx, (1-ratio*my)], [0,0]];
+          ratio = 1 - bezierScale((dist1/2) / innerRadius);
+          top = true;
+          //console.log('topshort');
         } else {
           // get the mid point
-          let mx = (x3+x4)/2;
-          let my = (y3+y4)/2;
+          mx = (x3+x4)/2;
+          my = (y3+y4)/2;
           // use ratio to determine how far to move the control point away from the center toward the mid point
-          let ratio = bezierScale((dist2/2) / innerRadius);
-          return [[0,0], [(1-ratio)*mx, (1-ratio)*my]];
+          ratio = 1 - bezierScale((dist2/2) / innerRadius);
+          top = false;
+          //console.log('botshort');
         }
+        let cp = [ratio*mx, ratio*my]
+        //console.log(cp);
+        return {top: top, cp: cp};
       };
       // get control points for the bezier from the end of the arc to the beginning of the next arc
-      let ctrls = getControlPoints(A1[5], A1[6], Q1[3], Q1[4], A2[5], A2[6], Q2[3], Q2[4]);
-      pathSegments[2] = 'Q ' + ctrls[0] + ' ' + Q1[3] + ',' + Q1[4];
-      pathSegments[4] = 'Q ' + ctrls[1] + ' ' + Q2[3] + ',' + Q2[4];
+      let x1 = A1[5], y1 = A1[6], x2 = Q1[3], y2 = Q1[4], x3 = A2[5], y3 = A2[6], x4 = Q2[3], y4 = Q2[4];
+      /*
+      if (Math.min(x1, x2) > Math.min(x3, x4)) {
+        console.log('swapped points');
+        x1 = x3; y1 = y3; x2 = x4; y2 = y4;
+        x3 = A1[5]; y3 = A1[6]; x4 = Q1[3]; y4 = Q1[4];
+      }
+      */
+      let ctrl = getControlPoints(x1,y1, x2,y2, x3,y3, x4,y4);
+      let q1 = ctrl.top ? [0,0] : ctrl.cp;
+      let q2 = ctrl.top ? ctrl.cp : [0,0];
+      pathSegments[0] = 'M' + [x4,y4];
+      pathSegments[1] = 'A' + [A1[1],A1[1]] + ' 0 ' + [A1[3],A1[4]] + ' ' + [x1,y1];
+      pathSegments[2] = 'Q' + ' ' + q2 + ' ' + [x2,y2];
+      pathSegments[3] = 'A' + [A2[1],A2[1]] + ' 0 ' + [A2[3],A2[4]] + ' ' + [x3,y3];
+      pathSegments[4] = 'Q' + ' ' + q1 + ' ' + [x4,y4];
 
       let newPath = pathSegments.join('');
-
+      //console.log(newPath);
+      //console.log(ctrl);
       return newPath;
     }
     // create the chord diagram
