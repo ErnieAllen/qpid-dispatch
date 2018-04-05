@@ -44,7 +44,10 @@ ChordData.prototype.setFilter = function (filter) {
 };
 ChordData.prototype.getAddresses = function () {
   let addresses = {};
-  this.snapshots.forEach( function (snap) {
+  let outer = this.snapshots;
+  if (outer.length === 0)
+    outer = outer = [this.last_values];
+  outer.forEach( function (snap) {
     snap.values.forEach( function (lv) {
       if (!(lv.address in addresses)) {
         addresses[lv.address] = this.filter.indexOf(lv.address) < 0;
@@ -55,6 +58,9 @@ ChordData.prototype.getAddresses = function () {
 };
 ChordData.prototype.getRouters = function () {
   let routers = {};
+  let outer = this.snapshots;
+  if (outer.length === 0)
+    outer = [this.last_values];
   this.snapshots.forEach( function (snap) {
     snap.values.forEach( function (lv) {
       if (!(lv.egress in routers)) {
