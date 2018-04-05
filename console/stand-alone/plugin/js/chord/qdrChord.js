@@ -261,6 +261,95 @@ var QDR = (function (QDR) {
       }
     };
 
+    function newPath(d) {
+      let path = chordReference(d);
+      return editPath(path);
+    }
+    // The path for the chords are drawn like:
+    // 1. move to the 1st point along the circle
+    // 2. arc from there to the 2nd point along the circle
+    // 3. bezier curve (Q) from there to a 3rd  point along the circle using (0,0) as the control point
+    // 4. arc from there to the 4th point along the circle
+    // 5. bezier curve from there to a 5th point along the circle again using (0,0) as the control point
+    // 6. close the path (Z)
+    // The problem is that if the point used for the bezier curve are close to each other, then
+    // you get a very tall and skinny curve. That curve will probably overlap another curve.
+    // To prevent that, we change the control point for the bezier curves to one that is closer
+    // to the edge of the circle.
+    function editPath(path) {
+      // path looks like: M1.0409497792752502e-14,-170A170,170 0 0,1 16.97222562874399,169.15065343417095Q 0,0 6.798733907985434,169.86399623595463A170,170 0 0,1 6.798733907985434,169.86399623595463Q 0,0 1.0409497792752502e-14,-170Z
+      // split out any letter followed by (non-letter or e)
+      var pathSegmentPattern = /[a-z]([^a-z]|e)*/ig;
+      var pathSegments = path.match(pathSegmentPattern);
+      if (pathSegments.length < 6)
+        return path;
+      /* pathSegments looks like:
+      "M18.109129956792305,-301.4565630604317"
+      "A302,302 0 1,1 -211.36504180953455,215.70539886811758"
+      "Q 0,0 1.8492166667125033e-14,-302"
+      "A302,302 0 0,1 1.8492166667125033e-14,-302"
+      "Q 0,0 18.109129956792305,-301.4565630604317"
+      "Z"
+      */
+      // get the points used to draw the bezier
+      let commaOrSpace = /[\s,]+/;
+      // the 1st point is defined at the end of the 1st arc
+      let A1 = pathSegments[1].split(commaOrSpace);
+      // the 2nd point is at the end of the bezier
+      let Q1 = pathSegments[2].split(commaOrSpace);
+
+      // the 1st point for the other bezier
+      let A2 = pathSegments[3].split(commaOrSpace);
+      // for the 2nd point of the other bezier
+      let Q2 = pathSegments[4].split(commaOrSpace);
+
+      /*
+      function round(number, precision) {
+        var shift = function (number, precision, reverseShift) {
+          if (reverseShift) {
+            precision = -precision;
+          }  
+          let numArray = ("" + number).split("e");
+          return +(numArray[0] + "e" + (numArray[1] ? (+numArray[1] + precision) : precision));
+        };
+        return shift(Math.round(shift(number, precision, false)), precision, true);
+      }
+      */
+      let getControlPoint = function (x1, y1, x2, y2) {
+        x1 = +x1;
+        x2 = +x2;
+        y1 = +y1;
+        y2 = +y2;
+        // get the mid point
+        let mx = (x1+x2)/2;
+        let my = (y1+y2)/2;
+
+        // get the distance between the 2 points
+        let dx = x1-x2;
+        let dy = y1-y2;
+        let dist = Math.sqrt(dx*dx + dy*dy);
+
+        // use ratio to determine how far to move the control point away from the center toward the mid point
+        let ratio = (dist/2) / innerRadius;
+        /*
+        console.log('for dist=' + dist + ' ratio=' + ratio);
+        console.log('  p=' + [[round(x1,3),round(y1,3)], [round(x2,3),round(y2,3)]]);
+        console.log('  m=' + [round(mx,3),round(my,3)]);
+        console.log('  c=' + [round((1-ratio)*mx,3), round((1-ratio)*my,3)]);
+        */
+        return [(1-ratio)*mx, (1-ratio)*my];
+      };
+      // get a control point for the bezier from the end of the arc to the beginning of the next arc
+      let Q1Control = getControlPoint(A1[5], A1[6], Q1[3], Q1[4]);
+      // the path has 2 beziers
+      let Q2Control = getControlPoint(A2[5], A2[6], Q2[3], Q2[4]);
+      pathSegments[2] = 'Q ' + Q1Control + ' ' + Q1[3] + ',' + Q1[4];
+      pathSegments[4] = 'Q ' + Q2Control + ' ' + Q2[3] + ',' + Q2[4];
+
+      let newPath = pathSegments.join('');
+
+      return newPath;
+    }
     // create the chord diagram
     let render = function (matrix) {
       // populate the arcColors object with a color for each router
@@ -315,6 +404,7 @@ var QDR = (function (QDR) {
         .append('title').text(function (d) {
           return arcTitle(d, matrix);
         });
+
       // create chords
       svg.append('svg:g')
         .attr('class', 'chords')
@@ -323,7 +413,7 @@ var QDR = (function (QDR) {
         .enter().append('svg:path')
         .style('stroke', function(d) { return d3.rgb(fillChord(matrix, d)).darker(); })
         .style('fill', function(d) { return fillChord(matrix, d); })
-        .attr('d', d3.svg.chord().radius(innerRadius))
+        .attr('d', newPath)
         .on('mouseover', mouseoverChord)
         .append('title').text(function(d) {
           return chordTitle(d, matrix);
@@ -594,7 +684,8 @@ var QDR = (function (QDR) {
         }
         let interpolate = d3.interpolate(old, d);
         return function(t) {
-          return chordReference(interpolate(t));
+          let td = editPath(chordReference(interpolate(t)));
+          return td;
         };
       };
     }
