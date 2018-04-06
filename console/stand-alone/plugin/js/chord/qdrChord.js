@@ -475,7 +475,7 @@ var QDR = (function (QDR) {
       svg.append('svg:g')
         .attr('class', 'chords')
         .selectAll('path')
-        .data(chord.chords)
+        .data(fixChords(chord.chords))
         .enter().append('svg:path')
         .style('stroke', function(d) { return d3.rgb(fillChord(matrix, d)).darker(); })
         .style('fill', function(d) { return fillChord(matrix, d); })
@@ -638,7 +638,35 @@ var QDR = (function (QDR) {
         return fixedGroups;
       };
     };
-    // TODO: add a fixChords function to adjust the chords start and end angles
+
+    // Adjust the chords start and end angles so none of them are too small.
+    // This prevents the bezier curve intersection test from returning false positives
+    // when the two curves touch each other at the end.
+    let fixChords = function (fn) {
+      let fixedChords = fn();
+      const gap = Math.PI / (360 * 3);
+      let widenAngles = function (chord) {
+        if (chord.startAngle === chord.endAngle) {
+          chord.startAngle -= gap;
+          chord.endAngle += gap;
+          if (chord.startAngle < 0) {
+            chord.startAngle = 0;
+            chord.endAngle = gap * 2;
+          }
+          if (chord.endAngle > Math.PI * 2) {
+            chord.endAngle = Math.PI * 2;
+            chord.startAngle = chord.endAngle - gap * 2;
+          }
+        }
+      };
+      fixedChords.forEach( function (chord) {
+        widenAngles(chord.source);
+        widenAngles(chord.target);
+      });
+      return function () {
+        return fixedChords;
+      };
+    };
 
     // after the svg is initialized, this is called periodically to animate the diagram to the new positions
     function rerender(matrix) {
@@ -695,7 +723,7 @@ var QDR = (function (QDR) {
       // update chords
       svg.select('.chords')
         .selectAll('path')
-        .data(rechord.chords)
+        .data(fixChords(rechord.chords))
         .transition()
         .duration(transitionDuration)
         .attrTween('d', chordTween(last_chord))

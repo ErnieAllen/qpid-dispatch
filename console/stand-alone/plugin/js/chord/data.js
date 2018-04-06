@@ -18,7 +18,7 @@ under the License.
 */
 
 'use strict';
-/* global angular Promise */
+/* global angular Promise MIN_CHORD_THRESHOLD */
 
 const SAMPLES = 3;  // number of snapshots to use for rate calculations
 
@@ -191,7 +191,7 @@ let calcRate = function (values, last_values, snapshots) {
     rateValues.push({ingress: value.ingress, 
       egress: value.egress, 
       address: value.address,
-      messages: Math.max(rate, 0.01)
+      messages: Math.max(rate, MIN_CHORD_THRESHOLD)
     });
   });
   return rateValues;

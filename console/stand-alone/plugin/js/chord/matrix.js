@@ -19,6 +19,8 @@ under the License.
 'use strict';
 /* global */
 
+const MIN_CHORD_THRESHOLD = 0.01;
+
 // public Matrix object
 function valuesMatrix(aggregate) {
   this.rows = [];
@@ -52,10 +54,9 @@ valuesMatrix.prototype.zeroInit = function (size) {
 };
 // return true of any of the matrix cells have messages
 valuesMatrix.prototype.hasValues = function () {
-  const threshold = 0.01;
   return this.rows.some(function (row) {
     return row.cols.some(function (col) {
-      return col.messages > threshold;
+      return col.messages > MIN_CHORD_THRESHOLD;
     });
   });
 };
@@ -65,7 +66,7 @@ valuesMatrix.prototype.matrixMessages = function () {
   let m = emptyMatrix(this.rows.length);
   this.rows.forEach( function (row, r) {
     row.cols.forEach( function (col, c) {
-      m[r][c] = col.messages;
+      m[r][c] = col.messages; 
     });
   });
   return m;
@@ -109,7 +110,7 @@ valuesMatrixRow.prototype.addCol = function (messages) {
   this.cols.push(new valuesMatrixCol(messages, this, this.cols.length));
 };
 valuesMatrixCol.prototype.addMessages = function (messages) {
-  if (!(this.messages === 0.01 && messages === 0.01))
+  if (!(this.messages === MIN_CHORD_THRESHOLD && messages === MIN_CHORD_THRESHOLD))
     this.messages += messages;
 };
 valuesMatrixCol.prototype.addAddress = function (address) {
