@@ -124,12 +124,9 @@ var QDR = (function (QDR) {
       chordData.setConverter($scope.legendOptions.byAddress ? separateAddresses: aggregateAddresses);
 
       initSvg();
-      $timeout( function () {
-        $scope.chordColors = {};
-        $scope.arcColors = {};
-        chordData.getMatrix().then(render);
-        interval = setInterval(doUpdate, transitionDuration);
-      });
+      chordData.getMatrix().then(render, function (e) { console.log(e);});
+      interval = setInterval(doUpdate, transitionDuration);
+      if(!$scope.$$phase) $scope.$apply();
     };
 
     let getRadius = function () {
@@ -170,29 +167,46 @@ var QDR = (function (QDR) {
     let formatNumber = d3.format(',.1f');
 
     // colors
-    let colorGen = d3.scale.category10();
+    let colorGen = d3.scale.category20();
+    // The colorGen funtion is not random access. 
+    // To get the correct color[19] you first have to get all previous colors
+    // I suspect some caching is going on in d3
+    for (let i=0; i<20; i++) {
+      colorGen(i);
+    }
+    // arc colors are taken from every other color starting at 0
+    let getArcColor = function (n) {
+      if (!(n in $scope.arcColors)) {
+        let ci = Object.keys($scope.arcColors).length * 2;
+        $scope.arcColors[n] = colorGen(ci);
+      }
+      return $scope.arcColors[n];
+    };
+    // chord colors are taken from every other color starting at 19 and going backwards
+    let getChordColor = function (n) {
+      if (!(n in $scope.chordColors)) {
+        let ci = 19 - Object.keys($scope.chordColors).length * 2;
+        let c = colorGen(ci);
+        $scope.chordColors[n] = c;
+      }
+      return $scope.chordColors[n];
+    };
     // return the color associated with a router
     let fillArc = function (matrixValues, row) {
       let router = matrixValues.routerName(row);
-      if (!(router in $scope.arcColors))
-        $scope.arcColors[router] = colorGen(Object.keys($scope.arcColors).length);
-      return $scope.arcColors[router];
+      return getArcColor(router);
     };
     // return the color associated with a chord.
     // if viewing by address, the color will be the address color.
     // if viewing aggregate, the color will be the router color of the largest chord ending
     let fillChord = function (matrixValues, d) {
-      let row = d.source.index;
+      // aggregate
       if (!$scope.legendOptions.byAddress) {
-        return fillArc(matrixValues, row);
+        return fillArc(matrixValues, d.source.index);
       }
       // by address
-      let col = d.source.subindex;
-      let addr = matrixValues.addressName(col);
-      if (!(addr in $scope.chordColors))
-        $scope.chordColors[addr] = colorGen(Object.keys($scope.chordColors).length + 
-                                            Object.keys($scope.arcColors).length);
-      return $scope.chordColors[addr];
+      let addr = matrixValues.addressName(d.source.subindex);
+      return getChordColor(addr);
     };
 
     let chord = d3.layout.chord()
@@ -249,15 +263,15 @@ var QDR = (function (QDR) {
       $scope.arcColors = {};
       let routers = chordData.getRouters();
       routers.forEach( function (router) {
-        $scope.arcColors[router] = colorGen(Object.keys($scope.arcColors).length);
+        getArcColor(router);
       });
     };
     let genChordColors = function () {
+      $scope.chordColors = {};
       if ($scope.legendOptions.byAddress) {
         $scope.addresses = chordData.getAddresses();
-        let offset = Object.keys($scope.arcColors).length;
         Object.keys($scope.addresses).forEach( function (address, i) {
-          $scope.chordColors[address] = colorGen(i + offset);
+          getChordColor(address);
         });
       }
     };
@@ -379,7 +393,7 @@ var QDR = (function (QDR) {
           top = false;
           //console.log('botshort');
         }
-        let cp = [ratio*mx, ratio*my]
+        let cp = [ratio*mx, ratio*my];
         //console.log(cp);
         return {top: top, cp: cp};
       };
@@ -431,18 +445,14 @@ var QDR = (function (QDR) {
         return;
       }
 
-      $timeout( function () {
-        $scope.addresses = chordData.getAddresses();
-      });
+      $scope.addresses = chordData.getAddresses();
 
       // pass just the raw numbers to the library
       chord.matrix(matrix.matrixMessages());
       last_chord = chord;
 
       // hide 'no data' message 
-      $timeout( function () {
-        $scope.noValues = false;
-      });
+      $scope.noValues = false;
 
       // save the number of chords
       last_chord_length = chord.chords().length;
@@ -521,13 +531,27 @@ var QDR = (function (QDR) {
       // size the rects around the labels so they respond to mouse events 
       svg.selectAll('.routers')
         .each(function () { 
-          var bbox = d3.select(this).select('text').node().getBBox();
-          d3.select(this).select('rect')
-            .attr('width', bbox.width)
-            .attr('height', bbox.height)
-            .attr('x', bbox.x)
-            .attr('y', bbox.y);
+          let node = d3.select(this).select('text').node();
+          if (node) {
+            let bbox;
+            try {
+              bbox = node.getBBox();
+            } catch (e) {
+              // ignore the error
+              //console.log('error gettting bbox: ' + e);
+            }
+            if (bbox) {
+              d3.select(this).select('rect')
+                .attr('width', bbox.width)
+                .attr('height', bbox.height)
+                .attr('x', bbox.x)
+                .attr('y', bbox.y);
+            }
+          }
         });
+
+      if(!$scope.$$phase) $scope.$apply();
+
     };
 
     // popup title when mouse is over a chord
@@ -637,10 +661,8 @@ var QDR = (function (QDR) {
         });
         return;
       }
-      $timeout( function () {
-        $scope.noValues = false;
-        $scope.addresses = chordData.getAddresses();
-      });
+      $scope.noValues = false;
+      $scope.addresses = chordData.getAddresses();
 
       // create a new chord layout so we can animate between the last one and this one
       let rechord = d3.layout.chord()
@@ -703,6 +725,8 @@ var QDR = (function (QDR) {
         });
 
       last_chord = rechord;
+      if(!$scope.$$phase) $scope.$apply();
+
     }
 
     // used to transition chords along a circular path instead of linear
@@ -797,10 +821,14 @@ var QDR = (function (QDR) {
     });
 
     // get the raw data and render the svg
-    chordData.getMatrix().then(render);
+    chordData.getMatrix().then(render, function (e) {
+      console.log('error while rendering ' + e);
+    });
     // called periodically to refresh the data
     function doUpdate() {
-      chordData.getMatrix().then(rerender);
+      chordData.getMatrix().then(rerender, function (e) {
+        console.log('error while rerendering ' + e);
+      });
     }
     let interval = setInterval(doUpdate, transitionDuration);
   
