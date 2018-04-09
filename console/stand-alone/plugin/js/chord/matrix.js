@@ -25,6 +25,38 @@ const MIN_CHORD_THRESHOLD = 0.01;
 function valuesMatrix(aggregate) {
   this.rows = [];
   this.aggregate = aggregate;
+  this.test = false;
+  //westford -> brno   2
+  //canton -> westford 1
+  // row receives column sends
+  //            brno      canton   westford
+  //this.mtest = [[0,0,2,0], [0,0,0,0], [0,1,0,0], [0,0,0,0]];
+  this.mtest = [
+    [
+      0,
+      0,
+      424.7434435575827,
+      611.7445838084378
+    ],
+    [
+      672.7480045610034,
+      363.7400228050171,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      415.0513112884835,
+      585.5188141391106,
+      648.8027366020525,
+      356.89851767388825
+    ]
+  ];
 }
 // a matrix row
 let valuesMatrixRow = function(r, chordName, ingress, egress, address) {
@@ -34,6 +66,7 @@ let valuesMatrixRow = function(r, chordName, ingress, egress, address) {
   this.egress = egress || '';
   this.index = r;
   this.cols = [];
+  this.debug = false;
   for (let c=0; c<r; c++) {
     this.addCol(0);
   }
@@ -46,6 +79,27 @@ let valuesMatrixCol = function(messages, row, c) {
   this.row = row;
 };
 
+valuesMatrix.prototype.debug = function (debug) {
+  this.test = debug;
+};
+valuesMatrix.prototype.setmtest = function (m) {
+  this.mtest[0][0] = +m.z0;
+  this.mtest[0][1] = +m.z1;
+  this.mtest[0][2] = +m.z2;
+  this.mtest[0][3] = +m.z3;
+  this.mtest[1][0] = +m.o0;
+  this.mtest[1][1] = +m.o1;
+  this.mtest[1][2] = +m.o2;
+  this.mtest[1][3] = +m.o3;
+  this.mtest[2][0] = +m.t0;
+  this.mtest[2][1] = +m.t1;
+  this.mtest[2][2] = +m.t2;
+  this.mtest[2][3] = +m.t3;
+  this.mtest[3][0] = +m.h0;
+  this.mtest[3][1] = +m.h1;
+  this.mtest[3][2] = +m.h2;
+  this.mtest[3][3] = +m.h3;
+}
 // initialize a matrix with empty data with size rows and columns
 valuesMatrix.prototype.zeroInit = function (size) {
   for (let r=0; r<size; r++) {
@@ -66,9 +120,13 @@ valuesMatrix.prototype.matrixMessages = function () {
   let m = emptyMatrix(this.rows.length);
   this.rows.forEach( function (row, r) {
     row.cols.forEach( function (col, c) {
-      m[r][c] = col.messages; 
+      m[r][c] = col.messages > MIN_CHORD_THRESHOLD ? col.messages : 0; 
     });
   });
+  if (this.test) {
+    console.log('returning test data' + this.mtest);
+    return this.mtest;
+  }
   return m;
 };
 

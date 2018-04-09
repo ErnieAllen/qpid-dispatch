@@ -17,7 +17,7 @@ specific language governing permissions and limitations
 under the License.
 */
 'use strict';
-/* global angular d3 separateAddresses aggregateAddresses ChordData Bezier */
+/* global angular d3 separateAddresses aggregateAddresses ChordData qdrRibbon */
 
 var QDR = (function (QDR) {
   QDR.module.controller('QDR.ChordController', ['$scope', 'QDRService', '$location', '$timeout', function($scope, QDRService, $location, $timeout) {
@@ -29,17 +29,82 @@ var QDR = (function (QDR) {
       return;
     }
 
-    const MIN_BEZIER = .5;
     const CHORDOPTIONSKEY = 'chordOptions';
     const CHORDFILTERKEY = 'chordFilter';
     // flag to show/hide the 'There are no values' message on the html page
     $scope.noValues = true;
     // state of the slider buttons
-    $scope.legendOptions = angular.fromJson(localStorage[CHORDOPTIONSKEY]) || {isRate: false, byAddress: false};
+    $scope.legendOptions = angular.fromJson(localStorage[CHORDOPTIONSKEY]) || {isRate: false, byAddress: false, test: false};
+    $scope.legendOptions.test = !!$scope.legendOptions.test;
     let excludedAddresses = angular.fromJson(localStorage[CHORDFILTERKEY]) || [];
     // colors for the legend and the diagram
     $scope.chordColors = {};
     $scope.arcColors = {};
+
+    $scope.debugging = false;
+    let m = [
+      [
+        0,
+        0,
+        424.7434435575827,
+        611.7445838084378
+      ],
+      [
+        672.7480045610034,
+        363.7400228050171,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        415.0513112884835,
+        585.5188141391106,
+        648.8027366020525,
+        356.89851767388825
+      ]
+    ];
+    $scope.m = {
+      z0: m[0][0], 
+      z1: m[0][1], 
+      z2: m[0][2], 
+      z3: m[0][3], 
+      
+      o0: m[1][0], 
+      o1: m[1][1], 
+      o2: m[1][2], 
+      o3: m[1][3], 
+      
+      t0: m[2][0], 
+      t1: m[2][1], 
+      t2: m[2][2], 
+      t3: m[2][3], 
+      
+      h0: m[3][0], 
+      h1: m[3][1], 
+      h2: m[3][2], 
+      h3: m[3][3]
+    };
+  
+    $scope.$watch('legendOptions.test', function (newValue, oldValue) {
+      chordReference.debug(newValue);
+    });
+    $scope.sourceIndex = 0;
+    $scope.subIndex = -1;
+    $scope.$watch('sourceIndex', function (n, o) {
+      $timeout( function () {
+        chordReference.sourceIndex(n);
+      });
+    });
+    $scope.$watch('subIndex', function (n, o) {
+      $timeout( function () {
+        chordReference.subIndex(n);
+      });
+    });
 
     // get notified when the byAddress slider is toggled
     $scope.$watch('legendOptions.byAddress', function (newValue, oldValue) {
@@ -276,150 +341,6 @@ var QDR = (function (QDR) {
       }
     };
 
-    function newPath(d) {
-      let path = chordReference(d);
-      return editPath(path);
-    }
-
-    // The path for the chords are drawn like:
-    // 1. move to the 1st point along the circle
-    // 2. arc from there to the 2nd point along the circle
-    // 3. bezier curve (Q) from there to a 3rd  point along the circle using (0,0) as the control point
-    // 4. arc from there to the 4th point along the circle
-    // 5. bezier curve from there to a 5th point along the circle again using (0,0) as the control point
-    // 6. close the path (Z)
-    // The problem is that if the point used for the bezier curve are close to each other, then
-    // you get a very tall and skinny curve. That curve will probably overlap another curve.
-    // To prevent that, we change the control point for the bezier curves to one that is closer
-    // to the edge of the circle.
-    function editPath(path) {
-      // path looks like: M1.0409497792752502e-14,-170A170,170 0 0,1 16.97222562874399,169.15065343417095Q 0,0 6.798733907985434,169.86399623595463A170,170 0 0,1 6.798733907985434,169.86399623595463Q 0,0 1.0409497792752502e-14,-170Z
-      // split out any letter followed by (non-letter or e)
-      var pathSegmentPattern = /[a-z]([^a-z]|e)*/ig;
-      var pathSegments = path.match(pathSegmentPattern);
-      if (pathSegments.length < 6) {
-        //console.log('returning original path');
-        //console.log(path);
-        return path;
-      }
-      //console.log('---');
-      //console.log(path);
-      /* pathSegments looks like:
-      "M18.109129956792305,-301.4565630604317"
-      "A302,302 0 1,1 -211.36504180953455,215.70539886811758"
-      "Q 0,0 1.8492166667125033e-14,-302"
-      "A302,302 0 0,1 1.8492166667125033e-14,-302"
-      "Q 0,0 18.109129956792305,-301.4565630604317"
-      "Z"
-      */
-      // get the points used to draw the bezier
-      let commaOrSpace = /[\s,]+/;
-      let M1 = pathSegments[0].split(commaOrSpace);
-      // the 1st point is defined at the end of the 1st arc
-      let A1 = pathSegments[1].split(commaOrSpace);
-      // the 2nd point is at the end of the bezier
-      let Q1 = pathSegments[2].split(commaOrSpace);
-
-      // the 1st point for the other bezier
-      let A2 = pathSegments[3].split(commaOrSpace);
-      // for the 2nd point of the other bezier
-      let Q2 = pathSegments[4].split(commaOrSpace);
-
-      let bezierScale = d3.scale.linear().domain([0,1]).range([MIN_BEZIER, 1]);
-      /*
-      function r(number, precision) {
-        precision = 2;
-        var shift = function (number, precision, reverseShift) {
-          if (reverseShift) {
-            precision = -precision;
-          }  
-          let numArray = ("" + number).split("e");
-          return +(numArray[0] + "e" + (numArray[1] ? (+numArray[1] + precision) : precision));
-        };
-        return shift(Math.round(shift(number, precision, false)), precision, true);
-      }
-      */
-      let getControlPoints = function (x1, y1, x2, y2, x3, y3, x4, y4) {
-        // inputs are strings. convert to numbers
-        x1 = +x1; x2 = +x2; y1 = +y1; y2 = +y2; 
-        x3 = +x3; x4 = +x4; y3 = +y3; y4 = +y4;
-        let dmx = x1-x4, dmy = y1-y4;
-        let dmx2 = x2-x3, dmy2 = y2-y3;
-        let curve1 = new Bezier(x1, y1, 0, 0, x2, y2);
-        let curve2;// = new Bezier(x3, y3, 0, 0, x4, y4);
-
-        if (Math.abs(dmx) < 1e-2 && Math.abs(dmy) < 1e-2) {
-          //console.log('points too close for intersection calc. Adjusting.');
-          curve2 = new Bezier(x3, y3, 0, 0, x4-.1, y4);
-        } else if (Math.abs(dmx2) < 1e-2 && Math.abs(dmy2) < 1e-2) {
-          //console.log('middle points too close for intersection calc. Adjusting.');
-          curve2 = new Bezier(x3+.1, y3, 0, 0, x4, y4);
-          //console.dump(curve1);
-          //console.dump(curve2);
-        } else
-          curve2 = new Bezier(x3, y3, 0, 0, x4, y4);
-
-        let intersects = curve1.intersects(curve2);
-        if (intersects.length < 2) {
-          //console.log('no intersections');
-          return {top: -1, cp: [0,0]};
-        }
-        //else
-        //  console.log('there are ' + intersects.length + ' intersections');
-        // get the distance between the 1st 2 points
-        let dx = x1-x2;
-        let dy = y1-y2;
-        let dist1 = Math.sqrt(dx*dx + dy*dy);
-        // get the distance between the 2nd 2 points
-        dx = x3-x4;
-        dy = y3-y4;
-        let dist2 = Math.sqrt(dx*dx + dy*dy);
-
-        let mx, my, ratio, top;
-        if (dist1 < dist2) {
-          // get the mid point
-          mx = (x1+x2)/2;
-          my = (y1+y2)/2;
-          // use ratio to determine how far to move the control point away from the center toward the mid point
-          ratio = 1 - bezierScale((dist1/2) / innerRadius);
-          top = true;
-          //console.log('topshort');
-        } else {
-          // get the mid point
-          mx = (x3+x4)/2;
-          my = (y3+y4)/2;
-          // use ratio to determine how far to move the control point away from the center toward the mid point
-          ratio = 1 - bezierScale((dist2/2) / innerRadius);
-          top = false;
-          //console.log('botshort');
-        }
-        let cp = [ratio*mx, ratio*my];
-        //console.log(cp);
-        return {top: top, cp: cp};
-      };
-      // get control points for the bezier from the end of the arc to the beginning of the next arc
-      let x1 = A1[5], y1 = A1[6], x2 = Q1[3], y2 = Q1[4], x3 = A2[5], y3 = A2[6], x4 = Q2[3], y4 = Q2[4];
-      /*
-      if (Math.min(x1, x2) > Math.min(x3, x4)) {
-        console.log('swapped points');
-        x1 = x3; y1 = y3; x2 = x4; y2 = y4;
-        x3 = A1[5]; y3 = A1[6]; x4 = Q1[3]; y4 = Q1[4];
-      }
-      */
-      let ctrl = getControlPoints(x1,y1, x2,y2, x3,y3, x4,y4);
-      let q1 = ctrl.top ? [0,0] : ctrl.cp;
-      let q2 = ctrl.top ? ctrl.cp : [0,0];
-      pathSegments[0] = 'M' + [x4,y4];
-      pathSegments[1] = 'A' + [A1[1],A1[1]] + ' 0 ' + [A1[3],A1[4]] + ' ' + [x1,y1];
-      pathSegments[2] = 'Q' + ' ' + q2 + ' ' + [x2,y2];
-      pathSegments[3] = 'A' + [A2[1],A2[1]] + ' 0 ' + [A2[3],A2[4]] + ' ' + [x3,y3];
-      pathSegments[4] = 'Q' + ' ' + q1 + ' ' + [x4,y4];
-
-      let newPath = pathSegments.join('');
-      //console.log(newPath);
-      //console.log(ctrl);
-      return newPath;
-    }
     // create the chord diagram
     let render = function (matrix) {
       // populate the arcColors object with a color for each router
@@ -446,6 +367,11 @@ var QDR = (function (QDR) {
       }
 
       $scope.addresses = chordData.getAddresses();
+
+      if ($scope.debugging) {
+        matrix.debug($scope.legendOptions.test);
+        matrix.setmtest($scope.m);
+      }
 
       // pass just the raw numbers to the library
       chord.matrix(matrix.matrixMessages());
@@ -475,11 +401,11 @@ var QDR = (function (QDR) {
       svg.append('svg:g')
         .attr('class', 'chords')
         .selectAll('path')
-        .data(fixChords(chord.chords))
+        .data(chord.chords)
         .enter().append('svg:path')
         .style('stroke', function(d) { return d3.rgb(fillChord(matrix, d)).darker(); })
         .style('fill', function(d) { return fillChord(matrix, d); })
-        .attr('d', newPath)
+        .attr('d', chordReference)
         .on('mouseover', mouseoverChord)
         .append('title').text(function(d) {
           return chordTitle(d, matrix);
@@ -639,35 +565,6 @@ var QDR = (function (QDR) {
       };
     };
 
-    // Adjust the chords start and end angles so none of them are too small.
-    // This prevents the bezier curve intersection test from returning false positives
-    // when the two curves touch each other at the end.
-    let fixChords = function (fn) {
-      let fixedChords = fn();
-      const gap = Math.PI / (360 * 3);
-      let widenAngles = function (chord) {
-        if (chord.startAngle === chord.endAngle) {
-          chord.startAngle -= gap;
-          chord.endAngle += gap;
-          if (chord.startAngle < 0) {
-            chord.startAngle = 0;
-            chord.endAngle = gap * 2;
-          }
-          if (chord.endAngle > Math.PI * 2) {
-            chord.endAngle = Math.PI * 2;
-            chord.startAngle = chord.endAngle - gap * 2;
-          }
-        }
-      };
-      fixedChords.forEach( function (chord) {
-        widenAngles(chord.source);
-        widenAngles(chord.target);
-      });
-      return function () {
-        return fixedChords;
-      };
-    };
-
     // after the svg is initialized, this is called periodically to animate the diagram to the new positions
     function rerender(matrix) {
       // if all the addresses are excluded, just show an empty circle
@@ -693,6 +590,10 @@ var QDR = (function (QDR) {
       $scope.addresses = chordData.getAddresses();
 
       // create a new chord layout so we can animate between the last one and this one
+      if ($scope.debugging) {
+        matrix.debug($scope.legendOptions.test);
+        matrix.setmtest($scope.m);
+      }
       let rechord = d3.layout.chord()
         .padding(arcPadding)
         .matrix(matrix.matrixMessages());
@@ -723,7 +624,7 @@ var QDR = (function (QDR) {
       // update chords
       svg.select('.chords')
         .selectAll('path')
-        .data(fixChords(rechord.chords))
+        .data(rechord.chords)
         .transition()
         .duration(transitionDuration)
         .attrTween('d', chordTween(last_chord))
@@ -758,7 +659,19 @@ var QDR = (function (QDR) {
     }
 
     // used to transition chords along a circular path instead of linear
-    let chordReference = d3.svg.chord().radius(innerRadius);
+    //let chordReference = d3.svg.chord().radius(innerRadius);
+    $scope.ribbon = {};
+    let chordReference;
+    if ($scope.debugging) {
+      chordReference = qdrRibbon().radius(innerRadius).debug($scope.legendOptions.test).cb(function (ribbon) {
+        $timeout(function () {
+          $scope.ribbon = ribbon;
+        });
+      }).sourceIndex(0).subIndex(-1);
+    }
+    else {
+      chordReference = qdrRibbon().radius(innerRadius);
+    } 
     // used to transition arcs along a curcular path instead of linear
     let arcReference = d3.svg.arc()
       .startAngle(function(d) { return d.startAngle; })
@@ -792,8 +705,7 @@ var QDR = (function (QDR) {
         }
         let interpolate = d3.interpolate(old, d);
         return function(t) {
-          let td = editPath(chordReference(interpolate(t)));
-          return td;
+          return chordReference(interpolate(t));
         };
       };
     }

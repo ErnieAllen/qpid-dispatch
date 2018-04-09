@@ -184,6 +184,18 @@
     opacity: 0;
     z-index: 0;
   }
+
+  div#switches input {
+    width: 4em;
+  }
+
+  div#debugging {
+    width: 20em;
+  }
+
+  div#switches.
+
+
   </style>
   
   <div ng-controller="QDR.ChordController">
@@ -194,7 +206,16 @@
         <ul>
           <li><span><input bootstrap-switch ng-model="legendOptions.isRate" type="checkbox"/> Rate</span></li>
           <li><span ng-hide="noValues"><input bootstrap-switch ng-model="legendOptions.byAddress" type="checkbox"/> By Address</span></li>
+          <li ng-show="debugging"><span><input bootstrap-switch ng-model="legendOptions.test" type="checkbox"/> Test</span></li>
         </ul>
+        <div id="debugging" ng-show="debugging">
+          <input ng-model='m.z0'/><input ng-model='m.z1'/><input ng-model='m.z2'/><input ng-model='m.z3'/><br/>
+          <input ng-model='m.o0'/><input ng-model='m.o1'/><input ng-model='m.o2'/><input ng-model='m.o3'/><br/>
+          <input ng-model='m.t0'/><input ng-model='m.t1'/><input ng-model='m.t2'/><input ng-model='m.t3'/><br/>
+          <input ng-model='m.h0'/><input ng-model='m.h1'/><input ng-model='m.h2'/><input ng-model='m.h3'/><br/>
+          <input ng-model='sourceIndex'/><input ng-model='subIndex'/>
+          <pre>{{ribbon}}</pre>
+        </div>
       </div>
       <div id="legend" ng-hide="noValues" >
         <h4>Routers</h4>
