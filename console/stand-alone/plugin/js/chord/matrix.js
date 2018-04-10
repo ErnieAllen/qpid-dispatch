@@ -120,7 +120,7 @@ valuesMatrix.prototype.matrixMessages = function () {
   let m = emptyMatrix(this.rows.length);
   this.rows.forEach( function (row, r) {
     row.cols.forEach( function (col, c) {
-      m[r][c] = col.messages > MIN_CHORD_THRESHOLD ? col.messages : 0; 
+      m[r][c] = col.messages;
     });
   });
   if (this.test) {
