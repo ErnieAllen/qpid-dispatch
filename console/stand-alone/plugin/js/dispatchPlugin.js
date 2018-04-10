@@ -74,7 +74,7 @@ var QDR = (function(QDR) {
    * This plugin's angularjs module instance
    */
   QDR.module = angular.module(QDR.pluginName, ['ngRoute', 'ngSanitize', 'ngResource', 'ui.bootstrap',
-    'ui.grid', 'ui.grid.selection', 'ui.grid.autoResize', 'ui.grid.resizeColumns', 'ui.grid.saveState', 'ui.slider']);
+    'ui.grid', 'ui.grid.selection', 'ui.grid.autoResize', 'ui.grid.resizeColumns', 'ui.grid.saveState', 'ui.slider', 'ui.checkbox']);
 
   // set up the routing for this plugin
   QDR.module.config(function($routeProvider) {

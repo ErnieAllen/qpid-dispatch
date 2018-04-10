@@ -90,17 +90,17 @@ var QDR = (function (QDR) {
       h3: m[3][3]
     };
   
-    $scope.$watch('legendOptions.test', function (newValue, oldValue) {
+    $scope.$watch('legendOptions.test', function (newValue) {
       chordReference.debug(newValue);
     });
     $scope.sourceIndex = 0;
     $scope.subIndex = -1;
-    $scope.$watch('sourceIndex', function (n, o) {
+    $scope.$watch('sourceIndex', function (n) {
       $timeout( function () {
         chordReference.sourceIndex(n);
       });
     });
-    $scope.$watch('subIndex', function (n, o) {
+    $scope.$watch('subIndex', function (n) {
       $timeout( function () {
         chordReference.subIndex(n);
       });
@@ -335,7 +335,7 @@ var QDR = (function (QDR) {
       $scope.chordColors = {};
       if ($scope.legendOptions.byAddress) {
         $scope.addresses = chordData.getAddresses();
-        Object.keys($scope.addresses).forEach( function (address, i) {
+        Object.keys($scope.addresses).forEach( function (address) {
           getChordColor(address);
         });
       }
@@ -643,7 +643,7 @@ var QDR = (function (QDR) {
         .attrTween('transform', tickTween(last_chord, matrix));
 
       svg.selectAll('.routers')
-        .each( function (d, i) {
+        .each( function () {
           d3.select(this).select('text')
             .attr('text-anchor', function(d) {
               return d.angle > Math.PI ? 'end' : null;

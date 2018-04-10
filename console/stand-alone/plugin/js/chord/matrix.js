@@ -99,7 +99,7 @@ valuesMatrix.prototype.setmtest = function (m) {
   this.mtest[3][1] = +m.h1;
   this.mtest[3][2] = +m.h2;
   this.mtest[3][3] = +m.h3;
-}
+};
 // initialize a matrix with empty data with size rows and columns
 valuesMatrix.prototype.zeroInit = function (size) {
   for (let r=0; r<size; r++) {

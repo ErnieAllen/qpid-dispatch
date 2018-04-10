@@ -19,10 +19,40 @@ under the License.
 'use strict';
 /* global d3 */
 
+/*
+  This is a replacement for the d3.svg.chord() ribbon generator.
+  The native d3 implementation is efficient, but its chords can become 'twisted'
+  in certain curcumatances.
+
+  A chord has up to 4 components:
+  1. A beginning arc along the edge of a circle
+  2. A quadratic bezier curve across the circle to the start of another arc
+  3. A 2nd arc along the edge of the circle
+  4. A quadratic bezier curve to the start of the 1st arc
+
+  Components 2 and 3 are dropped if the chord has only one endpoint.
+
+  The problem arises when the arcs are very close to each other and one arc is significantly
+  larger than the other. The inner bezier curve connecting the arcs extends towards the center
+  of the circle. The outer bezier curve connecting the outer ends of the arc crosses the inner
+  bezier curve causing the chords to look twisted.
+
+  The solution here is to adjust the inner bezier curve to not extend into the circle very far.
+  That is done by changing its control point. Instead of the control point being at the center
+  of the circle, it is moved towards the edge of the circle in the direction of the center of
+  the bezier curve.
+
+*/
+   
 const halfPI = Math.PI / 2.0;
 const twoPI = Math.PI * 2.0;
 
-// scales to interpolate when the bezier control point should be adjusted
+// These are scales to interpolate how the bezier control point should be adjusted.
+// These numbers were determined emperically by adjusting a chord and discovering
+// the relationship between the width of the inner bezier and the lengths of the arcs.
+// If we were just drawing the chord diagram once, we wouldn't need to use ranges. 
+// But since we are animating chords, we need to smoothly chnage the control point from
+// [0, 0] to 1/2 way to the center of the bezier curve. 
 const dom = [.06, .98, Math.PI];
 const ys = d3.scale.linear().domain(dom).range([.18, 0, 0]);
 const x0s = d3.scale.linear().domain(dom).range([.03, .24, .24]);
@@ -30,7 +60,7 @@ const x1s = d3.scale.linear().domain(dom).range([.24, .6, .6]);
 const x2s = d3.scale.linear().domain(dom).range([1.32, .8, .8]);
 const x3s = d3.scale.linear().domain(dom).range([3, 2, 2]);
 
-function qdrRibbon() {
+function qdrRibbon() { // eslint-disable-line no-unused-vars
   var r = 170;
   var t = false;
   var cb = function () {
@@ -133,17 +163,6 @@ function qdrRibbon() {
     if (show) {
       cb(JSON.stringify({arcs: [arc1, arc2], gaps: [gap1, gap2], sa: [sa0, sa1], ta: [ta0, ta1], ratiocp: ratiocp, cp1: cp1, cp2: cp2, sindex: d.source.index, ssub: d.source.subindex}, null, 2));
     }
-    /*
-    let p = 'M' + [s0x, s0y];
-    p += ('A' + [r,r,0,1,1,s1x,s1y]);
-    if (sa0 != ta0 || sa1 !== ta1) {
-      p += ('Q' + [cp1[0], cp1[1], t0x, t0y]);
-      if (t0x !== t1x || t0y !== t1y)
-        p += ('A' + [r,r,0,1,1,t1x,t1y]);
-    }
-    p += ('Q' + [cp2[0],cp2[1],s0x, s0y]);
-    p += 'Z';
-    */
     let path = d3.path();
     path.moveTo(s0x, s0y);
     path.arc(0, 0, r, sa0, sa1);
@@ -153,13 +172,6 @@ function qdrRibbon() {
     }
     path.quadraticCurveTo(cp2[0], cp2[1], s0x, s0y);
     path.closePath();
-    /*
-    if (p !== path+'') {
-      console.log(p);
-      console.log(path+'');
-      console.log('---');
-    }
-    */
     return path + '';
 
   };
@@ -191,7 +203,7 @@ function qdrRibbon() {
 }
 
 let sqr = function (n) { return n * n; };
-let dist = function (p1x, p1y, p2x, p2y) { return sqr(p1x - p2x) + sqr(p1y - p2y);}
+let dist = function (p1x, p1y, p2x, p2y) { return sqr(p1x - p2x) + sqr(p1y - p2y);};
 // distance from a point to a line segment
 let distToLine = function (vx, vy, wx, wy, px, py) {
   let vlen = dist(vx, vy, wx, wy);

@@ -191,7 +191,7 @@ let calcRate = function (values, last_values, snapshots) {
     rateValues.push({ingress: value.ingress, 
       egress: value.egress, 
       address: value.address,
-      messages: Math.max(rate, 0)//MIN_CHORD_THRESHOLD)
+      messages: Math.max(rate, MIN_CHORD_THRESHOLD)
     });
   });
   return rateValues;
