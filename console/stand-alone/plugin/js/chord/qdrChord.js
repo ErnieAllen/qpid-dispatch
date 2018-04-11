@@ -20,7 +20,7 @@ under the License.
 /* global angular d3 separateAddresses aggregateAddresses ChordData qdrRibbon */
 
 var QDR = (function (QDR) {
-  QDR.module.controller('QDR.ChordController', ['$scope', 'QDRService', '$location', '$timeout', function($scope, QDRService, $location, $timeout) {
+  QDR.module.controller('QDR.ChordController', ['$scope', 'QDRService', '$location', '$timeout', '$sce', function($scope, QDRService, $location, $timeout, $sce) {
 
     // if we get here and there is no connection, redirect to the connect page and then 
     // return here once we are connected
@@ -314,10 +314,12 @@ var QDR = (function (QDR) {
       last_chord_length = chord.chords().length;
 
       // create arcs
-      svg.append('svg:g')
+      let arcGroup = svg.append('svg:g')
         .attr('class', 'arcs')
         .selectAll('path')
-        .data(fixArcs(chord.groups, matrix))
+        .data(fixArcs(chord.groups, matrix), function (d) {return d.index;});
+
+      let newArcs = arcGroup
         .enter().append('svg:path')
         .style('fill', function(d) { return fillArc(matrix, d.index); })
         .style('stroke', function(d) { return fillArc(matrix, d.index); })
@@ -328,6 +330,7 @@ var QDR = (function (QDR) {
           let title = arcTitle(d, matrix);
           $timeout(function () {
             $scope.popoverContent = title;
+            $scope.trustedpopoverContent = $sce.trustAsHtml($scope.popoverContent);
           });
           d3.select('#popover-div')
             .style('display', 'block')
@@ -339,15 +342,18 @@ var QDR = (function (QDR) {
           d3.select('#popover-div')
             .style('display', 'none');
         });
-//        .append('title').text(function (d) {
-//          return arcTitle(d, matrix);
-//        });
 
       // create chords
-      svg.append('svg:g')
+      let chordGroup = svg.append('svg:g')
         .attr('class', 'chords')
         .selectAll('path')
-        .data(chord.chords)
+        .data(chord.chords, function (d) {
+          return d.source.index < d.target.index ? 
+            d.source.index + '-' + d.target.index :
+            d.target.index + '-' + d.source.index;
+        });
+
+      let newChords = chordGroup
         .enter().append('svg:path')
         .style('stroke', function(d) { return d3.rgb(fillChord(matrix, d)).darker(); })
         .style('fill', function(d) { return fillChord(matrix, d); })
@@ -369,9 +375,6 @@ var QDR = (function (QDR) {
           d3.select('#popover-div')
             .style('display', 'none');
         });
-      //.append('title').text(function(d) {
-      //  return chordTitle(d, matrix);
-      //});
 
       // create labels
       let ticks = svg.append('svg:g')
@@ -427,13 +430,13 @@ var QDR = (function (QDR) {
         let r = d.source.index;
         from = matrix.rows[r].ingress;
         to = matrix.rows[r].egress;
-        address = matrix.rows[r].address + '\n';
+        address = matrix.rows[r].address + '<br/>';
       }
       let title = address + from
       + ' → ' + to
       + ': ' + formatNumber(d.source.value);
       if (d.target.value > 0 && to !== from) {
-        title += ('\n' + to
+        title += ('<br/>' + to
         + ' → ' + from
         + ': ' + formatNumber(d.target.value));
       }
@@ -647,8 +650,10 @@ var QDR = (function (QDR) {
         let startAngle = (groups()[i].startAngle + groups()[i].endAngle) / 2;
         // d.angle is the ending angle
         let interpolate = d3.interpolateNumber(startAngle, d.angle);
+        let same = startAngle === d.angle;
         return function(t) {
-          return 'rotate(' + (interpolate(t) * 180 / Math.PI - 90) + ')'
+          let rot = same ? startAngle : interpolate(t);
+          return 'rotate(' + (rot * 180 / Math.PI - 90) + ')'
                + 'translate(' + textRadius + ',0)';
         };
       };
