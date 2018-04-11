@@ -34,77 +34,11 @@ var QDR = (function (QDR) {
     // flag to show/hide the 'There are no values' message on the html page
     $scope.noValues = true;
     // state of the slider buttons
-    $scope.legendOptions = angular.fromJson(localStorage[CHORDOPTIONSKEY]) || {isRate: false, byAddress: false, test: false};
-    $scope.legendOptions.test = !!$scope.legendOptions.test;
+    $scope.legendOptions = angular.fromJson(localStorage[CHORDOPTIONSKEY]) || {isRate: false, byAddress: false};
     let excludedAddresses = angular.fromJson(localStorage[CHORDFILTERKEY]) || [];
     // colors for the legend and the diagram
     $scope.chordColors = {};
     $scope.arcColors = {};
-
-    $scope.debugging = false;
-    let m = [
-      [
-        0,
-        0,
-        424.7434435575827,
-        611.7445838084378
-      ],
-      [
-        672.7480045610034,
-        363.7400228050171,
-        0,
-        0
-      ],
-      [
-        0,
-        0,
-        0,
-        0
-      ],
-      [
-        415.0513112884835,
-        585.5188141391106,
-        648.8027366020525,
-        356.89851767388825
-      ]
-    ];
-    $scope.m = {
-      z0: m[0][0], 
-      z1: m[0][1], 
-      z2: m[0][2], 
-      z3: m[0][3], 
-      
-      o0: m[1][0], 
-      o1: m[1][1], 
-      o2: m[1][2], 
-      o3: m[1][3], 
-      
-      t0: m[2][0], 
-      t1: m[2][1], 
-      t2: m[2][2], 
-      t3: m[2][3], 
-      
-      h0: m[3][0], 
-      h1: m[3][1], 
-      h2: m[3][2], 
-      h3: m[3][3]
-    };
-  
-    $scope.$watch('legendOptions.test', function (newValue) {
-      chordReference.debug(newValue);
-    });
-    $scope.sourceIndex = 0;
-    $scope.subIndex = -1;
-    $scope.$watch('sourceIndex', function (n) {
-      $timeout( function () {
-        chordReference.sourceIndex(n);
-      });
-    });
-    $scope.$watch('subIndex', function (n) {
-      $timeout( function () {
-        chordReference.subIndex(n);
-      });
-    });
 
     // get notified when the byAddress slider is toggled
     $scope.$watch('legendOptions.byAddress', function (newValue, oldValue) {
@@ -340,7 +274,8 @@ var QDR = (function (QDR) {
         });
       }
     };
-
+    let popoverChord = null;
+    let popoverArc = null;
     // create the chord diagram
     let render = function (matrix) {
       // populate the arcColors object with a color for each router
@@ -368,11 +303,6 @@ var QDR = (function (QDR) {
 
       $scope.addresses = chordData.getAddresses();
 
-      if ($scope.debugging) {
-        matrix.debug($scope.legendOptions.test);
-        matrix.setmtest($scope.m);
-      }
-
       // pass just the raw numbers to the library
       chord.matrix(matrix.matrixMessages());
       last_chord = chord;
@@ -393,9 +323,25 @@ var QDR = (function (QDR) {
         .style('stroke', function(d) { return fillArc(matrix, d.index); })
         .attr('d', arcReference)
         .on('mouseover', mouseoverArc)
-        .append('title').text(function (d) {
-          return arcTitle(d, matrix);
+        .on('mousemove', function (d) {
+          popoverArc = d;
+          let title = arcTitle(d, matrix);
+          $timeout(function () {
+            $scope.popoverContent = title;
+          });
+          d3.select('#popover-div')
+            .style('display', 'block')
+            .style('left', d3.event.pageX+'px')
+            .style('top', (d3.event.pageY-60)+'px');
+        })
+        .on('mouseout', function () {
+          popoverArc = null;
+          d3.select('#popover-div')
+            .style('display', 'none');
         });
+//        .append('title').text(function (d) {
+//          return arcTitle(d, matrix);
+//        });
 
       // create chords
       svg.append('svg:g')
@@ -407,9 +353,25 @@ var QDR = (function (QDR) {
         .style('fill', function(d) { return fillChord(matrix, d); })
         .attr('d', chordReference)
         .on('mouseover', mouseoverChord)
-        .append('title').text(function(d) {
-          return chordTitle(d, matrix);
+        .on('mousemove', function (d) {
+          popoverChord = d;
+          let title = chordTitle(d, matrix);
+          $timeout(function () {
+            $scope.popoverContent = title;
+          });
+          d3.select('#popover-div')
+            .style('display', 'block')
+            .style('left', d3.event.pageX+'px')
+            .style('top', (d3.event.pageY-60)+'px');
+        })
+        .on('mouseout', function () {
+          popoverChord = null;
+          d3.select('#popover-div')
+            .style('display', 'none');
         });
+      //.append('title').text(function(d) {
+      //  return chordTitle(d, matrix);
+      //});
 
       // create labels
       let ticks = svg.append('svg:g')
@@ -427,7 +389,7 @@ var QDR = (function (QDR) {
           return 'rotate(' + (d.angle * 180 / Math.PI - 90) + ')'
                 + 'translate(' + textRadius + ',0)';
         });
-  
+
       ticks.append('svg:line')
         .attr('x1', 1)
         .attr('y1', 0)
@@ -435,12 +397,6 @@ var QDR = (function (QDR) {
         .attr('y2', 0)
         .attr('stroke', '#000');
   
-      // needed for a click region
-      ticks.append('svg:rect')
-        .attr('transform', function(d) {
-          return d.angle > Math.PI ? 'rotate(180)translate(-16)' : null;
-        });
-
       ticks.append('svg:text')
         .attr('x', 8)
         .attr('dy', '.35em')
@@ -452,29 +408,8 @@ var QDR = (function (QDR) {
         })
         .text(function(d) { 
           return matrix.chordName(d.orgIndex, false);
-        });
-
-      // size the rects around the labels so they respond to mouse events 
-      svg.selectAll('.routers')
-        .each(function () { 
-          let node = d3.select(this).select('text').node();
-          if (node) {
-            let bbox;
-            try {
-              bbox = node.getBBox();
-            } catch (e) {
-              // ignore the error
-              //console.log('error gettting bbox: ' + e);
-            }
-            if (bbox) {
-              d3.select(this).select('rect')
-                .attr('width', bbox.width)
-                .attr('height', bbox.height)
-                .attr('x', bbox.x)
-                .attr('y', bbox.y);
-            }
-          }
-        });
+        })
+        .on('mouseover', mouseoverArc);
 
       if(!$scope.$$phase) $scope.$apply();
 
@@ -590,10 +525,6 @@ var QDR = (function (QDR) {
       $scope.addresses = chordData.getAddresses();
 
       // create a new chord layout so we can animate between the last one and this one
-      if ($scope.debugging) {
-        matrix.debug($scope.legendOptions.test);
-        matrix.setmtest($scope.m);
-      }
       let rechord = d3.layout.chord()
         .padding(arcPadding)
         .matrix(matrix.matrixMessages());
@@ -617,10 +548,15 @@ var QDR = (function (QDR) {
         .transition()
         .duration(transitionDuration)
         .attrTween('d', arcTween(last_chord))
-        .select('title').text(function (d) {
-          return arcTitle(d, matrix);
+        .each(function(d) {
+          if (popoverArc && popoverArc.index === d.index) {
+            let title = arcTitle(d, matrix);
+            $timeout(function () {
+              $scope.popoverContent = title;
+            });
+          }
         });
-    
+
       // update chords
       svg.select('.chords')
         .selectAll('path')
@@ -628,8 +564,13 @@ var QDR = (function (QDR) {
         .transition()
         .duration(transitionDuration)
         .attrTween('d', chordTween(last_chord))
-        .select('title').text(function(d) {
-          return chordTitle(d, matrix);
+        .each(function(d) {
+          if (popoverChord && popoverChord.source.index === d.source.index && popoverChord.source.subindex === d.source.subindex) {
+            let title = chordTitle(d, matrix);
+            $timeout(function () {
+              $scope.popoverContent = title;
+            });
+          }
         });
 
       // update ticks
@@ -659,19 +600,7 @@ var QDR = (function (QDR) {
     }
 
     // used to transition chords along a circular path instead of linear
-    //let chordReference = d3.svg.chord().radius(innerRadius);
-    $scope.ribbon = {};
-    let chordReference;
-    if ($scope.debugging) {
-      chordReference = qdrRibbon().radius(innerRadius).debug($scope.legendOptions.test).cb(function (ribbon) {
-        $timeout(function () {
-          $scope.ribbon = ribbon;
-        });
-      }).sourceIndex(0).subIndex(-1);
-    }
-    else {
-      chordReference = qdrRibbon().radius(innerRadius);
-    } 
+    let chordReference = qdrRibbon().radius(innerRadius);
     // used to transition arcs along a curcular path instead of linear
     let arcReference = d3.svg.arc()
       .startAngle(function(d) { return d.startAngle; })

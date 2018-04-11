@@ -61,13 +61,7 @@ const x2s = d3.scale.linear().domain(dom).range([1.32, .8, .8]);
 const x3s = d3.scale.linear().domain(dom).range([3, 2, 2]);
 
 function qdrRibbon() { // eslint-disable-line no-unused-vars
-  var r = 170;
-  var t = false;
-  var cb = function () {
-    //console.log(o);
-  };
-  var sourceIndex = 0;
-  var subIndex = -1;
+  var r = 200;  // random default. this will be set later
   var ribbon = function (d) {
     let sa0 = d.source.startAngle - halfPI,
       sa1 = d.source.endAngle - halfPI,
@@ -97,12 +91,6 @@ function qdrRibbon() { // eslint-disable-line no-unused-vars
     if (gap2 > Math.PI) gap2 = twoPI - gap2;
     let sgap = Math.min(gap1, gap2);
 
-    let show = (t && d.source.index === sourceIndex);
-    if (show && subIndex !== -1) {
-      if (d.source.subindex !== subIndex) {
-        show = false;
-      }
-    }
     // See if x, y is contained in trapezoid.
     // gap is the smallest gap in the chord
     // x is the size of the longest arc
@@ -147,7 +135,7 @@ function qdrRibbon() { // eslint-disable-line no-unused-vars
         // middle. get distance to top
         dist = top - y;
       }
-      let distScale = d3.scale.pow().exponent(2).domain([0, top/8, top/2, top]).range([0, .3, .4, .5]);
+      let distScale = d3.scale.linear().domain([0, top/8, top/2, top]).range([0, .3, .4, .5]);
       return distScale(dist);
     };
     let ratiocp = cpRatio(sgap, largeArc, smallArc);
@@ -160,9 +148,6 @@ function qdrRibbon() { // eslint-disable-line no-unused-vars
       } 
     }
     
-    if (show) {
-      cb(JSON.stringify({arcs: [arc1, arc2], gaps: [gap1, gap2], sa: [sa0, sa1], ta: [ta0, ta1], ratiocp: ratiocp, cp1: cp1, cp2: cp2, sindex: d.source.index, ssub: d.source.subindex}, null, 2));
-    }
     let path = d3.path();
     path.moveTo(s0x, s0y);
     path.arc(0, 0, r, sa0, sa1);
@@ -178,25 +163,6 @@ function qdrRibbon() { // eslint-disable-line no-unused-vars
   ribbon.radius = function (radius) {
     if (!arguments.length) return r;
     r = radius;
-    return ribbon;
-  };
-  ribbon.debug = function (debug) {
-    if (!arguments.length) return t;
-    t = debug;
-    return ribbon;
-  };
-  ribbon.cb = function (callback) {
-    cb = callback;
-    return ribbon;
-  };
-  ribbon.sourceIndex = function (si) {
-    sourceIndex = isNaN(+si) ? 0 : +si;
-    //console.log('sourceIndex changed to ' + sourceIndex);
-    return ribbon;
-  };
-  ribbon.subIndex = function (si) {
-    subIndex = isNaN(+si) ? 0 : +si;
-    //console.log('subIndex changed to ' + subIndex);
     return ribbon;
   };
   return ribbon;

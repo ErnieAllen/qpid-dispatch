@@ -148,9 +148,25 @@
     border-color: black;
   }
 
+  #popover-div {
+    position: absolute;
+    z-index: 200;
+    border-radius: 4px;
+    background-color: black;
+    color: white;
+    opacity: .95;
+    padding: 12px;
+    font-size: 14px;
+    display: none;
+  }
+
+  #chord text {
+    pointer-events: all;
+  }
   </style>
   
   <div ng-controller="QDR.ChordController">
+    <div id="popover-div" >{{popoverContent}}</div>
     <div ng-show="noValues"><h2>There is no message traffic</h2></div>
     <div ng-hide="noValues" id="chord"></div>
     <div id="controls">
