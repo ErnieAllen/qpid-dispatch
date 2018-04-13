@@ -589,8 +589,7 @@ var QDR = (function (QDR) {
 
       // new chords are paths
       chordPaths.enter().append('path')
-        .attr('class', 'chord')
-        .attr('opacity', 1);
+        .attr('class', 'chord');
 
       // do multiple concurrent tweens on the chords
       chordPaths
