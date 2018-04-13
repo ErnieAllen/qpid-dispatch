@@ -368,25 +368,27 @@ var QDR = (function (QDR) {
     let consolidateArcs = function (fn, matrix) {
       let fixedGroups = fn();
       if (!matrix.aggregate) {
-        let consolidatedGroups = [];
+        let consolidatedGroups = [], g;
         for (let r=0, len=fixedGroups.length, laste=''; r<len; r++) {
           let fg = fixedGroups[r];
           let e = matrix.rows[r].egress;
           let key = matrix.chordName(fg.index, false);
           if (e !== laste) {
-            consolidatedGroups.push({
-              startAngle: fg.startAngle, 
-              endAngle: fg.endAngle, 
-              angle: (fg.endAngle + fg.startAngle)/2, 
-              index: consolidatedGroups.length, 
+            g = {
+              startAngle: fg.startAngle,
+              endAngle: fg.endAngle,
+              angle: (fg.endAngle + fg.startAngle)/2,
+              index: consolidatedGroups.length,
               orgIndex: fg.index,
               key: key,
               components: [fg.index]
-            });
+            };
+            // we've run accross a new arc that is in the same router
+            consolidatedGroups.push(g);
           } else {
-            let g = consolidatedGroups[consolidatedGroups.length-1];
+            // update the current arcs info
             g.endAngle = fg.endAngle;
-            g.angle = (fg.startAngle + fg.endAngle)/2;
+            g.angle = (g.startAngle + fg.endAngle)/2;
             g.key = key;
             g.components.push(fg.index);
           }
@@ -784,7 +786,7 @@ var QDR = (function (QDR) {
       var oldTicks = {};
       if (oldArcs) {
         oldArcs.forEach( function(d) {
-          oldTicks[ d.orgIndex ] = d;
+          oldTicks[ d.key ] = d;
         });
       }
       let angle = function (d) {
@@ -792,7 +794,7 @@ var QDR = (function (QDR) {
       };
       return function (d) {
         var tween;
-        var old = oldTicks[d.orgIndex];
+        var old = oldTicks[d.key];
         let start = angle(d);
         let startTranslate = textRadius - 40;
         if (old) { //there's a matching old group
