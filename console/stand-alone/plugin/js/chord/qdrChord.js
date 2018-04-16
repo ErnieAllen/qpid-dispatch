@@ -17,7 +17,7 @@ specific language governing permissions and limitations
 under the License.
 */
 'use strict';
-/* global angular d3 separateAddresses aggregateAddresses ChordData qdrRibbon */
+/* global angular d3 separateAddresses aggregateAddresses ChordData qdrRibbon qrdlayoutChord */
 
 var QDR = (function (QDR) {
   QDR.module.controller('QDR.ChordController', ['$scope', 'QDRService', '$location', '$timeout', '$sce', function($scope, QDRService, $location, $timeout, $sce) {
@@ -71,14 +71,8 @@ var QDR = (function (QDR) {
         localStorage[CHORDOPTIONSKEY] = JSON.stringify($scope.legendOptions);
       }
     });
-
-    // fade out the empty circle that is shown when there is no traffic
-    let fadeDoughnut = function () {
-      d3.select(DOUGHNUT)
-        .transition()
-        .duration(200)
-        .attr('opacity', 0)
-        .remove();
+    $scope.arcColorsEmpty = function () {
+      return Object.keys($scope.arcColors).length === 0;
     };
 
     // event notification that an address checkbox has changed
@@ -139,6 +133,15 @@ var QDR = (function (QDR) {
       $scope.addressFilterChanged();
     };
 
+    // fade out the empty circle that is shown when there is no traffic
+    let fadeDoughnut = function () {
+      d3.select(DOUGHNUT)
+        .transition()
+        .duration(200)
+        .attr('opacity', 0)
+        .remove();
+    };
+
     // create an object that will be used to fetch the data
     let chordData = new ChordData(QDRService, 
       $scope.legendOptions.isRate, 
@@ -169,20 +172,28 @@ var QDR = (function (QDR) {
       // size of circle + text
       outerRadius = getRadius();
       // size of chords
-       innerRadius = outerRadius - 130;
+      innerRadius = outerRadius - 130;
       // arc ring around chords
       textRadius = Math.min(innerRadius * 1.1, innerRadius + 15);
     };
     setSizes();
 
     // TODO: handle window resizes
-    /*
-    let updateWindow  = function () {
-      setSizes();
-      startOver();
+    //let updateWindow  = function () {
+      //setSizes();
+      //startOver();
+    //};
+    //d3.select(window).on('resize.updatesvg', updateWindow);
+    let offBy = 6;
+    let windowResized = function () {
+      let legendPos = $('#legend').position();
+      let switches = $('#switches');
+      let outerWidth = switches.outerWidth();
+      switches.css({left: (legendPos.left - outerWidth - offBy), opacity: 1});
+      offBy = 0;
     };
-    d3.select(window).on('resize.updatesvg', updateWindow);        
-    */
+    window.addEventListener('resize', windowResized);
+    $().ready(windowResized)
 
     // used for animation duration and the data refresh interval 
     let transitionDuration = 1000;
@@ -224,11 +235,11 @@ var QDR = (function (QDR) {
     // if viewing aggregate, the color will be the router color of the largest chord ending
     let fillChord = function (matrixValues, d) {
       // aggregate
-      if (!$scope.legendOptions.byAddress) {
+      if (matrixValues.aggregate) {
         return fillArc(matrixValues, d.source.index);
       }
       // by address
-      let addr = matrixValues.addressName(d.source.subindex);
+      let addr = matrixValues.getAddress(d.source.orgindex, d.source.orgsubindex);
       return getChordColor(addr);
     };
 
@@ -304,18 +315,20 @@ var QDR = (function (QDR) {
     let popoverArc = null;
 
     let getRouterNames = function (d, matrix) {
-      let egress, ingress, address;
+      let egress, ingress, address = '';
       // for arcs d will have an index, for chords d will have a source.index and target.index
       let eindex = angular.isDefined(d.index) ? d.index : d.source.index;
-      let iindex = angular.isDefined(d.index) ? d.index : d.target.index;
+      let iindex = angular.isDefined(d.index) ? d.index : d.source.subindex;
       if (matrix.aggregate) {
         egress = matrix.rows[eindex].chordName;
         ingress = matrix.rows[iindex].chordName;
-        address = '';
       } else {
-        egress = matrix.rows[eindex].egress;
-        ingress = matrix.rows[eindex].ingress;
-        address = matrix.rows[eindex].address;
+        egress = matrix.routerName(eindex);
+        ingress = matrix.routerName(iindex);
+        // if a chord
+        if (d.source) {
+          address = matrix.getAddress(d.source.orgindex, d.source.orgsubindex);
+        }
       }
       return [ingress, egress, address];
     };
@@ -344,65 +357,32 @@ var QDR = (function (QDR) {
         value = d.value;
       }
       else {
-        egress = matrix.rows[d.index].egress;
-        matrix.rows.forEach( function (row) {
-          if (row.egress === egress) {
-            row.cols.forEach(function (col) {
-              value += col.messages;
-            });
-          }
-        });
+        egress = matrix.routerName(d.index);
+        value = d.value;
       }
       return egress + ': ' + formatNumber(value);
     };
 
-    let getChordData = function (rechord, matrix) {
+    let decorateChordData = function (rechord, matrix) {
       let data = rechord.chords();
-      data.forEach( function (d) {
+      data.forEach( function (d, i) {
         d.key = chordKey(d, matrix, false);
+        d.orgIndex = i;
         d.color = fillChord(matrix, d);
       });
       return data;
     };
 
-    let consolidateArcs = function (fn, matrix) {
+    let decorateArcData = function (fn, matrix) {
       let fixedGroups = fn();
-      if (!matrix.aggregate) {
-        let consolidatedGroups = [], g;
-        for (let r=0, len=fixedGroups.length, laste=''; r<len; r++) {
-          let fg = fixedGroups[r];
-          let e = matrix.rows[r].egress;
-          let key = matrix.chordName(fg.index, false);
-          if (e !== laste) {
-            g = {
-              startAngle: fg.startAngle,
-              endAngle: fg.endAngle,
-              angle: (fg.endAngle + fg.startAngle)/2,
-              index: consolidatedGroups.length,
-              orgIndex: fg.index,
-              key: key,
-              components: [fg.index]
-            };
-            // we've run accross a new arc that is in the same router
-            consolidatedGroups.push(g);
-          } else {
-            // update the current arcs info
-            g.endAngle = fg.endAngle;
-            g.angle = (g.startAngle + fg.endAngle)/2;
-            g.key = key;
-            g.components.push(fg.index);
-          }
-          laste = e;
-        }
-        fixedGroups = consolidatedGroups;
-      } else {
-        fixedGroups.forEach( function (fg) {
-          fg.orgIndex = fg.index;
-          fg.angle = (fg.endAngle + fg.startAngle)/2;
-          fg.key = matrix.chordName(fg.index, false);
-          fg.components = [fg.index];
-        });
-      }
+      fixedGroups.forEach( function (fg) {
+        fg.orgIndex = fg.index;
+        fg.angle = (fg.endAngle + fg.startAngle)/2;
+        fg.key = matrix.routerName(fg.index);
+        fg.components = [fg.index];
+        fg.router = matrix.aggregate ? fg.key : matrix.getEgress(fg.index);
+        fg.color = getArcColor(fg.router);
+      });
       return fixedGroups;
     };
 
@@ -422,8 +402,7 @@ var QDR = (function (QDR) {
       }
 
       $scope.noValues = false;
-      let matrixMessages, duration = switchedByAddress ? 0 : transitionDuration;
-      switchedByAddress = false;
+      let matrixMessages, duration = transitionDuration;
 
       // if there is no data, show an empty circle and a message
       if (!matrix.hasValues()) {
@@ -447,13 +426,12 @@ var QDR = (function (QDR) {
       }
 
       // create a new chord layout so we can animate between the last one and this one
-      let rechord = d3.layout.chord()
-        .padding(ARCPADDING)
-        .matrix(matrixMessages);
+      let groupBy = matrix.getGroupBy();
+      let rechord = qrdlayoutChord().padding(ARCPADDING).groupBy(groupBy).matrix(matrixMessages);
 
       // The chord layout has a function named .groups() that returns the
       // data for the arcs. We decorate this data with a unique key.
-      rechord.arcData = consolidateArcs(rechord.groups, matrix);
+      rechord.arcData = decorateArcData(rechord.groups, matrix);
 
       // join the decorated data with a d3 selection
       let arcsGroup = svg.selectAll('g.arc')
@@ -465,23 +443,28 @@ var QDR = (function (QDR) {
 
       // each new arc is an svg:path that has a fixed color
       newArcs.append('svg:path')
-        .style('fill', function(d) { 
-          return fillArc(matrix, d.orgIndex);
-        })
-        .style('stroke', function(d) { return fillArc(matrix, d.orgIndex); });
+        .style('fill', function(d) { return d.color; })
+        .style('stroke', function(d) { return d.color; });
+
+      newArcs.append('svg:text')
+        .attr('dy', '.35em')
+        .text(function (d) {
+          return d.router;
+        });
 
       // attach event listeners to all arcs (new or old)
       arcsGroup
         .on('mouseover', mouseoverArc)
         .on('mousemove', function (d) {
           popoverArc = d;
+          let top = $('#chord').offset().top - 5;
           $timeout(function () {
             $scope.trustedpopoverContent = $sce.trustAsHtml(arcTitle(d, matrix));
           });
           d3.select('#popover-div')
             .style('display', 'block')
-            .style('left', d3.event.pageX+'px')
-            .style('top', (d3.event.pageY-60)+'px');
+            .style('left', (d3.event.pageX+5)+'px')
+            .style('top', (d3.event.pageY-top)+'px');
         })
         .on('mouseout', function () {
           popoverArc = null;
@@ -494,98 +477,39 @@ var QDR = (function (QDR) {
         .transition()
         .duration(duration)
         //.ease('linear')
-        .attrTween('d', arcTween(last_chord))
-      
+        .attrTween('d', arcTween(last_chord));
+      arcsGroup.select('text')
+        .attr('text-anchor', function (d) {
+          return d.angle > Math.PI ? 'end' : 'begin';
+        })
+        .transition()
+        .duration(duration)
+        .attrTween('transform', tickTween(last_labels));
+
       // check if the mouse is hovering over an arc. if so, update the tooltip
       arcsGroup
         .each(function(d) {
           if (popoverArc && popoverArc.index === d.index) {
-            $timeout(function () {
-              $scope.trustedpopoverContent = $sce.trustAsHtml(arcTitle(d, matrix));
-            });
+            $scope.trustedpopoverContent = $sce.trustAsHtml(arcTitle(d, matrix));
           }
         });
 
       // animate the removal of any arcs that went away
-      arcsGroup.exit()
+      let exitingArcs = arcsGroup.exit();
+
+      exitingArcs.selectAll('text')
+        .transition()
+        .duration(duration/2)
+        .attrTween('opacity', function () {return function (t) {return 1 - t;};});
+
+      exitingArcs.selectAll('path')
         .transition()
         .duration(duration/2)
         .attrTween('d', arcTweenExit)
-        .remove(); //remove after transitions are complete
-
-      // put a label on each group
-      let tickGroup = svg.selectAll('g.tick')
-        .data(rechord.arcData, function (d) {
-          return d.key;
-        });
-
-      // new arcs get a group containing a tick
-      let enteringTicks = tickGroup.enter().append('svg:g')
-        .attr('class', 'tick');
-
-      enteringTicks.append('svg:line')
-        .attr('opacity', 0)
-        .attr('x1', 1)
-        .attr('y1', 0)
-        .attr('x2', 5)
-        .attr('y2', 0)
-        .attr('stroke', '#000');
-
-      // give the new ticks names
-      enteringTicks.append('text')
-        .attr('class', 'tick-text')
-        .attr('x', 8)
-        .attr('dy', '.35em')
-        .attr('opacity', 0)
-        .text(function(d) {
-          return matrix.chordName(d.orgIndex, false);
-        });
-
-      // fade in
-      enteringTicks.select('text')
-        .transition()
-        .duration(duration)
-        .attr('opacity', 1);
-
-      enteringTicks.select('line')
-        .transition()
-        .duration(duration)
-        .attr('opacity', 1);
-
-      tickGroup
-        .on('mouseover', mouseoverArc);
-
-      // orient the text every update
-      tickGroup.select('text.tick-text')
-        .attr('text-anchor', function(d) {
-          return d.angle > Math.PI ? 'end' : null;
-        })
-        .attr('transform', function(d) {
-          return d.angle > Math.PI ? 'rotate(180) translate(-16)' : null;
-        });
-
-      // move the group to new location around the circle
-      tickGroup
-        .transition()
-        .duration(duration)
-        //.ease('linear')
-        .attrTween('transform', tickTween(last_labels));
-
-      // selection of lables to be removed
-      let exitingTicks = tickGroup.exit();
-
-      // fade them out and then remove them
-      exitingTicks.select('text')
-        .attr('class', 'fading-tick')
-        .transition()
-        .duration(duration/2)
-        .attr('opacity', 0)
-        .each('end', function () {
-          exitingTicks.remove();
-        });
+        .each('end', function (d) {d3.select(this).node().parentNode.remove();});
 
       // decorate the chord layout's .chord() data with key, color, and orgIndex
-      rechord.chordData = getChordData(rechord, matrix);
+      rechord.chordData = decorateChordData(rechord, matrix);
       let chordPaths = svg.selectAll('path.chord')
         .data(rechord.chordData, function (d) { return d.key;});
 
@@ -593,19 +517,31 @@ var QDR = (function (QDR) {
       chordPaths.enter().append('path')
         .attr('class', 'chord');
 
-      // do multiple concurrent tweens on the chords
-      chordPaths
-        .call(tweenChordEnds, duration, last_chord)
-        .call(tweenChordColor, duration, last_chord, 'stroke')
-        .call(tweenChordColor, duration, last_chord, 'fill');
-
+      if (!switchedByAddress) {
+        // do multiple concurrent tweens on the chords
+        chordPaths
+          .call(tweenChordEnds, duration, last_chord)
+          .call(tweenChordColor, duration, last_chord, 'stroke')
+          .call(tweenChordColor, duration, last_chord, 'fill');
+      } else {
+        // switchByAddress is only true when we have new chords
+        chordPaths
+          .attr('d', function (d) {return chordReference(d);})
+          .attr('stroke', function (d) {return d3.rgb(d.color).darker(1);})
+          .attr('fill', function (d) {return d.color;})
+          .attr('opacity', 1e-6)
+          .transition()
+          .duration(duration/2)
+          .attr('opacity', .67);
+      }
+  
       // if the mouse is hovering over a chord, update it's tooltip
       chordPaths
         .each(function(d) {
-          if (popoverChord && popoverChord.source.index === d.source.index && popoverChord.source.subindex === d.source.subindex) {
-            $timeout(function () {
-              $scope.trustedpopoverContent = $sce.trustAsHtml(chordTitle(d, matrix));
-            });
+          if (popoverChord && 
+            popoverChord.source.orgindex === d.source.orgindex && 
+            popoverChord.source.orgsubindex === d.source.orgsubindex) {
+            $scope.trustedpopoverContent = $sce.trustAsHtml(chordTitle(d, matrix));
           }
         });
 
@@ -614,13 +550,14 @@ var QDR = (function (QDR) {
         .on('mouseover', mouseoverChord)
         .on('mousemove', function (d) {
           popoverChord = d;
+          let top = $('#chord').offset().top - 5;
           $timeout(function () {
             $scope.trustedpopoverContent = $sce.trustAsHtml(chordTitle(d, matrix));
           });
           d3.select('#popover-div')
             .style('display', 'block')
-            .style('left', d3.event.pageX+'px')
-            .style('top', (d3.event.pageY-60)+'px');
+            .style('left', (d3.event.pageX+5)+'px')
+            .style('top', (d3.event.pageY-top)+'px');
         })
         .on('mouseout', function () {
           popoverChord = null;
@@ -628,17 +565,32 @@ var QDR = (function (QDR) {
             .style('display', 'none');
         });
 
-      // animate the removal of chords
-      chordPaths.exit()
-        .attr('class', 'exiting-chord')
-        .transition()
-        .duration(duration/2)
-        .attrTween('d', chordTweenExit)
-        .remove(); //remove after transitions are complete
+      let exitingChords = chordPaths.exit()
+        .attr('class', 'exiting-chord');
+
+      if (!switchedByAddress) {
+        // shrink chords to their center point upon removal
+        exitingChords
+          .transition()
+          .duration(duration/2)
+          .attrTween('d', chordTweenExit)
+          .remove();
+      } else {
+        // just fake them out if we are switching between byAddress and aggregate
+        exitingChords
+          .transition()
+          .duration(duration/2)
+          .ease('linear')
+          .attr('opacity', 1e-6)
+          .remove();
+      }
 
       // keep track of this layout so we can animate from this layout to the next layout
       last_chord = rechord;
       last_labels = last_chord.arcData;
+      switchedByAddress = false;
+
+      // update the UI for any $scope variables that changed
       if(!$scope.$$phase) $scope.$apply();
     }
 
@@ -656,8 +608,9 @@ var QDR = (function (QDR) {
     // animate the disappearance of an arc by shrinking it to its center point
     function arcTweenExit(d) {
       let angle = (d.startAngle+d.endAngle)/2;
-      let to = {startAngle: angle, endAngle: angle};
-      let tween = d3.interpolate(d, to);
+      let to = {startAngle: angle, endAngle: angle, value: 0};
+      let from = {startAngle: d.startAngle, endAngle: d.endAngle, value: d.value};
+      let tween = d3.interpolate(from, to);
       return function (t) {
         return arcReference( tween(t) );
       };
@@ -695,8 +648,8 @@ var QDR = (function (QDR) {
         }
         else {
           //create a zero-width arc object
-          var emptyArc = {startAngle:d.startAngle,
-            endAngle:d.startAngle};
+          let mid = (d.startAngle + d.endAngle) / 2;
+          var emptyArc = {startAngle: mid, endAngle: mid};
           tween = d3.interpolate(emptyArc, d);
         }
             
@@ -735,11 +688,13 @@ var QDR = (function (QDR) {
               }
             } else {
               // there was no old chord so make a fake one
+              let midStart = (d.source.startAngle + d.source.endAngle) / 2;
+              let midEnd = (d.target.startAngle + d.target.endAngle) / 2;
               old = {
-                source: { startAngle: d.source.startAngle,
-                  endAngle: d.source.startAngle},
-                target: { startAngle: d.target.startAngle,
-                  endAngle: d.target.startAngle}
+                source: { startAngle: midStart,
+                  endAngle: midStart},
+                target: { startAngle: midEnd,
+                  endAngle: midEnd}
               };
             }
             interpolate = d3.interpolate(old, d);
@@ -770,8 +725,8 @@ var QDR = (function (QDR) {
               oldColor = old.color;
             }
             if (style === 'stroke') {
-              oldColor = d3.rgb(oldColor).darker(3);
-              newColor = d3.rgb(newColor).darker(3);
+              oldColor = d3.rgb(oldColor).darker(1);
+              newColor = d3.rgb(newColor).darker(1);
             }
             interpolate = d3.interpolate(oldColor, newColor);
             return function(t) {
@@ -797,6 +752,7 @@ var QDR = (function (QDR) {
         var old = oldTicks[d.key];
         let start = angle(d);
         let startTranslate = textRadius - 40;
+        let orient = d.angle > Math.PI ? 'rotate(180)' : '';
         if (old) { //there's a matching old group
           start = angle(old);
           startTranslate = textRadius;
@@ -804,34 +760,31 @@ var QDR = (function (QDR) {
         tween = d3.interpolateNumber(start, angle(d));
         let same = start === angle(d);
         let tsame = startTranslate === textRadius;
-        // disable the translate for now
-        tsame = true;
 
-        let transTween = d3.interpolateNumber(startTranslate, textRadius);
+        let transTween = d3.interpolateNumber(startTranslate, textRadius + 10);
 
         return function (t) {
           let rot = same ? start : tween(t);
           if (isNaN(rot))
             rot = 0;
-          let tra = tsame ? textRadius : transTween(t);
+          let tra = tsame ? (textRadius + 10) : transTween(t);
           return 'rotate(' + (rot * 180 / Math.PI - 90) + ') '
-          + 'translate(' + tra + ',0)';
+          + 'translate(' + tra + ',0)' + orient;
         };
       };
     }
 
     // fade all chords that don't belong to the given arc index
     function mouseoverArc(d) {
-      let components = d.components;
       d3.selectAll('path.chord').classed('fade', function(p) {
-        return components.indexOf(p.source.index) < 0 && components.indexOf(p.target.index) < 0;
+        return d.index !== p.source.index && d.index !== p.target.index;
       });
     }
 
     // fade all chords except the given one
     function mouseoverChord(d) {
       svg.selectAll('path.chord').classed('fade', function(p) {
-        return !(p.source.index === d.source.index && p.target.index === d.target.index);
+        return !(p.source.orgindex === d.source.orgindex && p.target.orgindex === d.target.orgindex);
       });
     }
 
@@ -845,7 +798,8 @@ var QDR = (function (QDR) {
       clearInterval(interval);
       // clean up memory associated with the svg
       d3.select('#chord').remove();
-      d3.select(window).on('resize.updatesvg', null);        
+      d3.select(window).on('resize.updatesvg', null);
+      window.removeEventListener('resize', windowResized);
     });
 
     // get the raw data and render the svg

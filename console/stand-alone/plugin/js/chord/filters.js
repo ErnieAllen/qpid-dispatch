@@ -41,7 +41,52 @@ var aggregateAddresses = function (values, filter) { // eslint-disable-line no-u
 };
 
 // this filter will show an arc per router-address
-var separateAddresses = function (values, filter) { // eslint-disable-line no-unused-vars
+var _separateAddresses = function (values, filter) { // eslint-disable-line no-unused-vars
+  let m = new valuesMatrix(false);
+  values = values.filter( function (v) { return filter.indexOf(v.address) < 0;});
+  if (values.length === 0)
+    return m;
+
+  let addresses = {}, routers = {};
+  // get the list of routers and addresses in the data
+  values.forEach( function (value) {
+    addresses[value.address] = true;
+    routers[value.ingress] = true;
+    routers[value.egress] = true;
+  });
+  let saddresses = Object.keys(addresses).sort();
+  let srouters = Object.keys(routers).sort();
+  let alen = saddresses.length;
+  // sanity check
+  if (alen === 0)
+    return m;
+
+  /* Convert the data to a matrix */
+
+  // initialize the matrix to have the correct ingress, egress, and address in each row and col
+  m.zeroInit(saddresses.length * srouters.length);
+  m.rows.forEach( function (row, r) {
+    let egress = srouters[Math.floor(r/alen)];
+    row.cols.forEach( function (col, c) {
+      let ingress = srouters[Math.floor(c/alen)];
+      let address = saddresses[c % alen];
+      m.setRowCol(r, c, ingress, egress, address, 0);
+    });
+  });
+  // set the values at each cell in the matrix
+  for (let i=0, alen=saddresses.length, vlen=values.length; i<vlen; i++) {
+    let value = values[i];
+    let egressIndex = srouters.indexOf(value.egress);
+    let ingressIndex = srouters.indexOf(value.ingress);
+    let addressIndex = saddresses.indexOf(value.address);
+    let row = egressIndex * alen + addressIndex;
+    let col = ingressIndex * alen + addressIndex;
+    m.setColMessages(row, col, value.messages);
+  }
+  return m;
+};
+
+let separateAddresses = function (values, filter) { // eslint-disable-line no-unused-vars
   let m = new valuesMatrix(false);
   values.forEach( function (value) {
     if (filter.indexOf(value.address) < 0) {
@@ -60,4 +105,3 @@ var separateAddresses = function (values, filter) { // eslint-disable-line no-un
   });
   return m.sorted();
 };
-

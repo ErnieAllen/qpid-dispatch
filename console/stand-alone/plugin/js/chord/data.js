@@ -26,6 +26,7 @@ function ChordData (QDRService, isRate, converter) {
   this.QDRService = QDRService;
   this.last_matrix = undefined;
   this.last_values = {values: undefined, timestamp: undefined};
+  this.rateValues = undefined;
   this.snapshots = [];  // last N values used for calculating rate
   this.isRate = isRate;
   // fn to convert raw data to matrix
@@ -61,14 +62,10 @@ ChordData.prototype.getRouters = function () {
   let outer = this.snapshots;
   if (outer.length === 0)
     outer = [this.last_values];
-  this.snapshots.forEach( function (snap) {
+  outer.forEach( function (snap) {
     snap.values.forEach( function (lv) {
-      if (!(lv.egress in routers)) {
-        routers[lv.egress] = true;
-      }
-      if (!(lv.ingress in routers)) {
-        routers[lv.ingress] = true;
-      }
+      routers[lv.egress] = true;
+      routers[lv.ingress] = true;
     });
   });
   return Object.keys(routers).sort();
@@ -144,6 +141,12 @@ ChordData.prototype.getMatrix = function () {
     });
   }));
 };
+ChordData.prototype.convertUsing = function (converter) {
+  let values = this.isRate ? this.rateValues : this.last_values.values;
+
+  // convert the values to a matrix using the requested converter and the current filter
+  return converter(values, this.filter);
+};
 
 // Private functions
 
@@ -212,14 +215,10 @@ let convert = function (self, values) {
   genKeys(values);
   sortByKeys(values);
 
+  self.last_values.values = angular.copy(values);
+  self.last_values.timestamp = Date.now();
   if (self.isRate) {
-    let rateValues = calcRate(values, self.last_values, self.snapshots);
-    self.last_values.values = angular.copy(values);
-    self.last_values.timestamp = Date.now();
-    values = rateValues;
-  } else {
-    self.last_values.values = angular.copy(values);
-    self.last_values.timestamp = Date.now();
+    self.rateValues = values = calcRate(values, self.last_values, self.snapshots);
   }
   // convert the raw data to a matrix
   let matrix = self.converter(values, self.filter);

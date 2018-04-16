@@ -8,37 +8,43 @@
   }
   path.fade {
     opacity: 0.1;
-    /*display: none;*/
   }
  
   .routers rect {
     fill: white;
   }
   
-  #controls {
+  g.arc text {
+    fill: black;
+    stroke-width: 0;
+  }
+  #chord {
+    position: absolute;
+  }
+
+  #switches {
     position: absolute;
     top: 1em;
-    right: 1em;
-    margin: 1em;
+    margin-right: 1em;
+    padding-right: 1em;
+    opacity: 0;
   }
-  #controls #switches ul {
+  #switches ul {
     list-style: none;
   }
 
-  #controls #switches {
-    float: left;
-    margin-right: 1em;
-  }
-
-  #controls #switches li {
+  #switches li {
     margin-bottom: 1em;
   }
-  #controls #legend {
-    float: right;
+  #legend {
+    position: absolute;
+    right: 1em;
+    top: 1em;
     padding: 0 1em;
     border: 1px solid black;
     border-radius: 4px;
     min-width: 10em;
+    background-color: white;
   }
   #legend .legend-color {
     width: 19.6667px;
@@ -60,7 +66,7 @@
   }
 
   #legend .legend-line {
-    margin: 1em;
+    margin: 0.5em 1em;
     border: 1px solid white;
   }
   #legend .legend-line:hover {
@@ -118,8 +124,12 @@
     fill-opacity: .67;
   }
 
-#legend ul.addresses li {
+#legend ul.addresses li, #legend ul.routers li {
   margin-top: 0.5em;
+}
+
+#legend ul.routers li {
+  margin-bottom: 0.5em;
 }
 #legend ul.addresses {
   margin-bottom: 1.5em;
@@ -173,38 +183,36 @@
     <div id="popover-div" ng-bind-html="trustedpopoverContent"></div>
     <div id="noTraffic"></div>
     <div id="chord"></div>
-    <div id="controls">
-      <div id="switches">
-        <ul>
-          <li>
-              <checkbox title="Select to show message rates" ng-model="legendOptions.isRate"></checkbox>
-              <span title="Select to show message rates">Show rates</span>
-          </li>
-          <li>
-              <checkbox title="Select to break out traffic by address" ng-model="legendOptions.byAddress"></checkbox>
-              <span title="Select to break out traffic by address">Show by address</span>
+    <div id="legend">
+      <div ng-hide="arcColorsEmpty()">
+        <h4>Routers</h4>
+        <ul class="routers">
+          <li ng-repeat="(router, color) in arcColors" class="legend-line" ng-mouseover="enterRouter(router)" ng-mouseleave="leaveLegend()">
+            <span class='legend-color' ng-style="{'background-color': color}"></span>
+            <span class='legend-router' title="{{router}}">{{router | limitTo:15}}{{router.length>15 ? '…' : ''}}</span>
           </li>
         </ul>
       </div>
-      <div id="legend">
-        <div ng-hide="noValues">
-          <h4>Routers</h4>
-          <ul>
-            <li ng-repeat="(router, color) in arcColors" class="legend-line" ng-mouseover="enterRouter(router)" ng-mouseleave="leaveLegend()">
-              <span class='legend-color' ng-style="{'background-color': color}"></span>
-              <span class='legend-router' title="{{router}}">{{router | limitTo:15}}{{router.length>15 ? '…' : ''}}</span>
-            </li>
-          </ul>
-      </div>
-        <h4>Addresses</h4>
-        <ul class="addresses">
-          <li ng-repeat="(address, color) in addresses" class="legend-line">
-            <checkbox style="background-color: {{chordColors[address]}};"
-              title="{{address}}" ng-change="addressFilterChanged()"
-              ng-model="addresses[address]"></checkbox>
-            <span ng-mouseenter="enterLegend(address)" ng-mouseleave="leaveLegend()" ng-click="addressClick(address)" title="{{address}}">{{address | limitTo : 15}}{{address.length>15 ? '…' : ''}}</span>
-          </li>
-        </ul>
-      </div>
+      <h4>Addresses</h4>
+      <ul class="addresses">
+        <li ng-repeat="(address, color) in addresses" class="legend-line">
+          <checkbox style="background-color: {{chordColors[address]}};"
+            title="{{address}}" ng-change="addressFilterChanged()"
+            ng-model="addresses[address]"></checkbox>
+          <span ng-mouseenter="enterLegend(address)" ng-mouseleave="leaveLegend()" ng-click="addressClick(address)" title="{{address}}">{{address | limitTo : 15}}{{address.length>15 ? '…' : ''}}</span>
+        </li>
+      </ul>
+    </div>
+    <div id="switches">
+      <ul>
+        <li>
+            <checkbox title="Select to show message rates" ng-model="legendOptions.isRate"></checkbox>
+            <span title="Select to show message rates">Show rates</span>
+        </li>
+        <li>
+            <checkbox title="Select to break out traffic by address" ng-model="legendOptions.byAddress"></checkbox>
+            <span title="Select to break out traffic by address">Show by address</span>
+        </li>
+      </ul>
     </div>
   </div>
