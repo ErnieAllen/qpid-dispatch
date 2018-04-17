@@ -121,7 +121,7 @@ var QDR = (function (QDR) {
         }
       });
       d3.selectAll('path.chord').classed('fade', function(p) {
-        return indexes.indexOf(p.source.index) < 0 && indexes.indexOf(p.target.index) < 0;
+        return indexes.indexOf(p.source.orgindex) < 0 && indexes.indexOf(p.target.orgindex) < 0;
       });
     };
     $scope.leaveLegend = function () {
