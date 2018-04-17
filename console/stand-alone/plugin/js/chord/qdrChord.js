@@ -97,12 +97,12 @@ var QDR = (function (QDR) {
       // fade all chords that don't have this address 
       let indexes = [];
       chordData.last_matrix.rows.forEach( function (row, r) {
-        if (row.address === addr) {
+        let addresses = chordData.last_matrix.getAddresses(r);
+        if (addresses.indexOf(addr) >= 0)
           indexes.push(r);
-        }
       });
       d3.selectAll('path.chord').classed('fade', function(p) {
-        return indexes.indexOf(p.source.index) < 0 && indexes.indexOf(p.target.index) < 0;
+        return indexes.indexOf(p.source.orgindex) < 0 && indexes.indexOf(p.target.orgindex) < 0;
       });
     };
 
@@ -180,8 +180,8 @@ var QDR = (function (QDR) {
 
     // TODO: handle window resizes
     //let updateWindow  = function () {
-      //setSizes();
-      //startOver();
+    //setSizes();
+    //startOver();
     //};
     //d3.select(window).on('resize.updatesvg', updateWindow);
     let offBy = 6;
@@ -192,8 +192,11 @@ var QDR = (function (QDR) {
       switches.css({left: (legendPos.left - outerWidth - offBy), opacity: 1});
       offBy = 0;
     };
-    window.addEventListener('resize', windowResized);
-    $().ready(windowResized)
+    window.addEventListener('resize', function () {
+      windowResized()
+      setTimeout(windowResized, 1);
+    });
+    $().ready(windowResized);
 
     // used for animation duration and the data refresh interval 
     let transitionDuration = 1000;
@@ -576,7 +579,7 @@ var QDR = (function (QDR) {
           .attrTween('d', chordTweenExit)
           .remove();
       } else {
-        // just fake them out if we are switching between byAddress and aggregate
+        // just fade them out if we are switching between byAddress and aggregate
         exitingChords
           .transition()
           .duration(duration/2)

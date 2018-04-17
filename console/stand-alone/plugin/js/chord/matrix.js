@@ -119,6 +119,14 @@ valuesMatrix.prototype.getIngress = function (i) {
 valuesMatrix.prototype.getAddress = function (r, c) {
   return this.rows[r].cols[c].address;
 };
+valuesMatrix.prototype.getAddresses = function (r) {
+  let addresses = {};
+  this.rows[r].cols.forEach( function (c) {
+    if (c.address && c.messages)
+      addresses[c.address] = true;
+  });
+  return Object.keys(addresses);
+};
 let getAttribute = function (self, attr, i) {
   if (self.aggregate)
     return self.rows[i][attr];
