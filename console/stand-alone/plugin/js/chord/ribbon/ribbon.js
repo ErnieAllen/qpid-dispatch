@@ -19,38 +19,13 @@ under the License.
 'use strict';
 /* global d3 */
 
-/*
-  This is a replacement for the d3.svg.chord() ribbon generator.
-  The native d3 implementation is efficient, but its chords can become 'twisted'
-  in certain curcumatances.
-
-  A chord has up to 4 components:
-  1. A beginning arc along the edge of a circle
-  2. A quadratic bezier curve across the circle to the start of another arc
-  3. A 2nd arc along the edge of the circle
-  4. A quadratic bezier curve to the start of the 1st arc
-
-  Components 2 and 3 are dropped if the chord has only one endpoint.
-
-  The problem arises when the arcs are very close to each other and one arc is significantly
-  larger than the other. The inner bezier curve connecting the arcs extends towards the center
-  of the circle. The outer bezier curve connecting the outer ends of the arc crosses the inner
-  bezier curve causing the chords to look twisted.
-
-  The solution implemented here is to adjust the inner bezier curve to not extend into the circle very far.
-  That is done by changing its control point. Instead of the control point being at the center
-  of the circle, it is moved towards the edge of the circle in the direction of the midpoint of 
-  the bezier curve's end points.
-
-*/
-   
 const halfPI = Math.PI / 2.0;
 const twoPI = Math.PI * 2.0;
 
 // These are scales to interpolate how the bezier control point should be adjusted.
 // These numbers were determined emperically by adjusting a chord and discovering
 // the relationship between the width of the inner bezier and the lengths of the arcs.
-// If we were just drawing the chord diagram once, we wouldn't need to use ranges. 
+// If we were just drawing the chord diagram once, we wouldn't need to use scales. 
 // But since we are animating chords, we need to smoothly chnage the control point from
 // [0, 0] to 1/2 way to the center of the bezier curve. 
 const dom = [.06, .98, Math.PI];
@@ -63,7 +38,7 @@ const x3s = d3.scale.linear().domain(dom).range([3, 2, 2]);
 function qdrRibbon() { // eslint-disable-line no-unused-vars
   var r = 200;  // random default. this will be set later
 
-  // This is the funtion that gets called to produce a path for a chord.
+  // This is the function that gets called to produce a path for a chord.
   // The path should end up looking like 
   // M[start point]A[arc options][arc end point]Q[control point][end points]A[arc options][arc end point]Q[control point][end points]Z
   var ribbon = function (d) {
@@ -90,6 +65,7 @@ function qdrRibbon() { // eslint-disable-line no-unused-vars
     // if the bezier curves intersect, ratiocp will be > 0
     let ratiocp = cpRatio(sgap, largeArc, smallArc);
 
+    // x, y points for the start and end of the arcs
     let s0x = r * Math.cos(sa0),
       s0y = r * Math.sin(sa0),
       t0x = r * Math.cos(ta0),
